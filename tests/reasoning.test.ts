@@ -68,3 +68,22 @@ describe("model id rules", () => {
     expect(canUseConfigUpdate("anthropic/claude-opus-5", ["anthropic/claude-opus-5"])).toBe(false);
   });
 });
+
+import { reasoningParts } from "../src/reasoning";
+describe("reasoningParts", () => {
+  it("prefers detail text and summaries, counting encrypted blocks", () => {
+    const r = reasoningParts({
+      reasoning: "fallback",
+      reasoning_details: [
+        { type: "reasoning.summary", summary: "Short summary" },
+        { type: "reasoning.text", text: "Full thoughts" },
+        { type: "reasoning.encrypted" },
+      ],
+    });
+    expect(r).toEqual({ text: "Short summary\n\nFull thoughts", encrypted: 1 });
+  });
+  it("falls back to the plain reasoning string", () => {
+    expect(reasoningParts({ reasoning: "plain" })).toEqual({ text: "plain", encrypted: 0 });
+    expect(reasoningParts(undefined)).toEqual({ text: "", encrypted: 0 });
+  });
+});

@@ -86,3 +86,18 @@ export function canUseConfigUpdate(id: string, blocked: string[] = []): boolean 
   if (i.startsWith("openai/")) return gte(version(i, /gpt-(\d+)(?:\.(\d+))?/), 6, 0);
   return false;
 }
+
+/** Human-readable reasoning for the collapsed panel: text/summary blocks, with encrypted blocks counted. */
+export function reasoningParts(a: {
+  reasoning?: string;
+  reasoning_details?: { type: string; text?: string; summary?: string }[];
+} | undefined): { text: string; encrypted: number } {
+  if (!a) return { text: "", encrypted: 0 };
+  const d = a.reasoning_details ?? [];
+  const text = d
+    .map((x) => (x.type === "reasoning.text" ? x.text : x.type === "reasoning.summary" ? x.summary : undefined))
+    .filter((t): t is string => !!t && t.trim() !== "")
+    .join("\n\n");
+  const encrypted = d.filter((x) => x.type === "reasoning.encrypted").length;
+  return { text: text || a.reasoning || "", encrypted };
+}

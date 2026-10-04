@@ -88,6 +88,8 @@ export interface Card {
   question: string;
   /** effort change stored with the card so replays keep it in the same position */
   configUpdate?: { effort: Effort };
+  /** request-level effort actually in force for this card (root: the baseline sent on every replay) */
+  effortUsed?: Effort;
   blocks: string[];
   assistant?: AssistantMessage;
   model: string;

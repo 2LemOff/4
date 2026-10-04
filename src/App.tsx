@@ -1,0 +1,39 @@
+import { useEffect, useState } from "react";
+import { JobChip } from "./components/JobChip";
+import { parseRoute } from "./route";
+import { CardScreen } from "./screens/CardScreen";
+import { DraftScreen } from "./screens/DraftScreen";
+import { Home } from "./screens/Home";
+import { Library } from "./screens/Library";
+import { OutlineScreen } from "./screens/OutlineScreen";
+import { Settings } from "./screens/Settings";
+
+export function App() {
+  const [hash, setHash] = useState(location.hash);
+  useEffect(() => {
+    const h = () => setHash(location.hash);
+    window.addEventListener("hashchange", h);
+    return () => window.removeEventListener("hashchange", h);
+  }, []);
+  const r = parseRoute(hash);
+  const tab = r.name === "library" || r.name === "outline" ? "library" : r.name === "settings" ? "settings" : "learn";
+
+  return (
+    <div className="app">
+      <div className="view">
+        {r.name === "home" && <Home />}
+        {r.name === "card" && <CardScreen key={r.sid} sid={r.sid} cid={r.cid} hl={r.hl} />}
+        {r.name === "draft" && <DraftScreen key={`${r.cid}-${r.block}-${r.sentence}`} sid={r.sid} cid={r.cid} block={r.block} sentence={r.sentence} />}
+        {r.name === "library" && <Library />}
+        {r.name === "outline" && <OutlineScreen id={r.id} />}
+        {r.name === "settings" && <Settings section={r.section} />}
+      </div>
+      <JobChip />
+      <nav className="tabs" aria-label="Main">
+        <a href="#/" className={tab === "learn" ? "on" : ""} aria-current={tab === "learn" ? "page" : undefined}>Learn</a>
+        <a href="#/library" className={tab === "library" ? "on" : ""} aria-current={tab === "library" ? "page" : undefined}>Library</a>
+        <a href="#/settings" className={tab === "settings" ? "on" : ""} aria-current={tab === "settings" ? "page" : undefined}>Settings</a>
+      </nav>
+    </div>
+  );
+}
