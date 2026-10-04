@@ -18,7 +18,7 @@ Open the app, go to **Settings › Account** and tap **Connect OpenRouter** (or 
 
 ## Put it on your phone
 
-`.github/workflows/pages.yml` builds and deploys to GitHub Pages on every push to `main` (or run it by hand from the Actions tab). In the repository settings, set **Pages › Source** to **GitHub Actions**. Then open `https://<user>.github.io/<repo>/` on your phone and use **Add to Home screen**. That address is also the OpenRouter sign-in callback.
+`.github/workflows/pages.yml` builds and deploys to GitHub Pages on every push to `main` or to the development branch `ccr-baca0b70-3nv94g` (or run it by hand from the Actions tab). In the repository settings, set **Pages › Source** to **GitHub Actions**. Then open `https://<user>.github.io/<repo>/` on your phone and use **Add to Home screen**. That address is also the OpenRouter sign-in callback.
 
 ## Screenshots
 
