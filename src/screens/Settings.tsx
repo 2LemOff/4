@@ -5,6 +5,7 @@ import { roleModel, settingsFor } from "../ai";
 import { ModelPicker } from "../components/ModelPicker";
 import { ModelSettingsEditor } from "../components/ModelSettingsEditor";
 import { SynthesisEditor } from "../components/SynthesisEditor";
+import { CouncilEditor } from "../components/CouncilEditor";
 import { challengeS256, authUrl, makeVerifier } from "../openrouter";
 import { ANSWER_FORMAT, composeSystemPrompt, DEFAULT_SYSTEM_PROMPT, detectToggles, PROMPT_PARTS, setToggle } from "../prompts";
 import { go } from "../route";
@@ -14,6 +15,7 @@ import type { PromptToggles } from "../types";
 const SECTIONS = [
   ["account", "Account"],
   ["models", "Models"],
+  ["council", "Council"],
   ["prompt", "System prompt"],
   ["synthesis", "Synthesis"],
   ["storage", "Storage"],
@@ -32,6 +34,13 @@ export function Settings({ section }: { section: string }) {
       </div>
       {section === "account" && <Account />}
       {section === "models" && <Models />}
+      {section === "council" && (
+        <section>
+          <h2 className="section">LLM Council</h2>
+          <p className="muted small">Switch the council on with its button next to the question box. Members answer, review each other anonymously, and the chairman writes the final answer using only their text.</p>
+          <CouncilEditor />
+        </section>
+      )}
       {section === "prompt" && <PromptSettings />}
       {section === "synthesis" && <SynthesisSettings />}
       {(section === "storage" || section === "data") && <StorageSettings />}

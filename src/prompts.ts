@@ -158,6 +158,23 @@ export function composeSynthesisPrompt(s: SynthesisSettings, categories: string[
   return lines.join("\n");
 }
 
+// ── LLM Council ──────────────────────────────────────────────────────────────
+
+export const CHAIRMAN_RULES = `You are the Chairman of an LLM Council. Several models answered the learner's message; their answers (Response A, B, …) and peer reviews follow.
+Write the single final answer in the required JSON pyramid format, following the system prompt's style.
+Grounding rules (strict):
+- Use ONLY information that appears in the council's responses. Add nothing from your own knowledge or any other source.
+- Every node must include "sources": the labels of the responses it comes from, e.g. ["A","C"].
+- Where members disagree, state the disagreement as its own node with both sources.
+- If something the learner needs is not covered by the council, add a node saying "Not covered by the council: …" instead of filling it in.
+- Weigh the peer rankings when choosing between conflicting claims.`;
+
+export const VERIFIER_PROMPT = `You check grounding. For each chairman point, decide whether it is supported by the council responses (stated or directly implied there). Do not use outside knowledge: a true statement that isn't in the responses is NOT supported. Reply with JSON only: {"results":[{"id":"…","supported":true|false,"quote":"short supporting quote or empty"}]}.`;
+
+export function reviewPrompt(question: string, responses: string): string {
+  return `You are evaluating different responses to the following question:\n\n${question}\n\nHere are the responses from different models (anonymized):\n\n${responses}\n\nYour task:\n1. Evaluate each response individually: what it does well and what it does poorly, focusing on accuracy and insight.\n2. Then rank them from best to worst.\n\nReply with JSON only: {"evaluation":"…","ranking":["Response C","Response A",…]}. If you cannot reply in JSON, end with a section "FINAL RANKING:" listing "1. Response X" lines.`;
+}
+
 export const TAG_PROMPT =
   "Give a 2-4 word topic tag for the question and answer below. Reply with JSON only: {\"tag\": \"...\"}.";
 

@@ -125,7 +125,13 @@ export async function mockOpenRouter(page: Page, opts: MockOptions = {}): Promis
         calls.stream.push(body);
         const o = opts.stream?.(body) ?? {};
         const prefix = userText.match(/\(Answer id prefix: (K\d+)\)$/)?.[1];
-        const text = opts.answer ? opts.answer(userText, body) : prefix ? pyramidAnswer(prefix) : ANSWER;
+        let text = opts.answer ? opts.answer(userText, body) : prefix ? pyramidAnswer(prefix) : ANSWER;
+        if (userText.includes("COUNCIL RESPONSES") && prefix) {
+          // chairman: n5 has no source, n6 cites B (the verifier will reject n6)
+          const a = JSON.parse(pyramidAnswer(prefix));
+          a.nodes = a.nodes.map((n: any, i: number) => ({ ...n, sources: i === 4 ? [] : i === 5 ? ["B"] : ["A"] }));
+          text = JSON.stringify(a);
+        }
         const chunks: unknown[] = [];
         if (o.reasoning !== false) {
           chunks.push({ choices: [{ delta: { reasoning: "Let me think. ", reasoning_details: [{ type: "reasoning.text", text: "Let me think. ", index: 0, id: "r1", format: "google-gemini-v1" }] } }] });
@@ -140,6 +146,14 @@ export async function mockOpenRouter(page: Page, opts: MockOptions = {}): Promis
 
       calls.json.push(body);
       const reply = (content: string) => json({ choices: [{ message: { role: "assistant", content }, finish_reason: "stop" }], usage: { prompt_tokens: 10, completion_tokens: 5 } });
+      if (userText.includes("You are evaluating different responses")) {
+        const labels = [...userText.matchAll(/^Response ([A-Z]):/gm)].map((m) => `Response ${m[1]}`);
+        return reply(JSON.stringify({ evaluation: "B is clearest; A is thorough.", ranking: [...labels].reverse() }));
+      }
+      if (systemText.includes("You check grounding")) {
+        const ids = [...userText.matchAll(/^\[(K\d+\.n\d+)\]/gm)].map((m) => m[1]);
+        return reply(JSON.stringify({ results: ids.map((id) => ({ id, supported: !id.endsWith(".n6"), quote: "" })) }));
+      }
       if (systemText.includes("topic tag")) return reply(JSON.stringify({ tag: `Tag ${calls.json.filter((b) => (b.messages?.[0]?.content ?? "").toString().includes("topic tag")).length}` }));
       if (userText.includes("Candidates:")) {
         const ids = [...userText.matchAll(/^\[(\w+)\]/gm)].map((m) => m[1]);

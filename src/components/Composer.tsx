@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ask, settingsFor } from "../ai";
+import { councilChairman, councilMembers as councilMembersList } from "../council";
 import { go, hrefCard } from "../route";
 import { settingsStore, updateSettings, useStore } from "../store";
 import { Icon } from "./Icon";
@@ -8,6 +9,7 @@ import { ModelSettingsEditor } from "./ModelSettingsEditor";
 import { Sheet } from "./Sheet";
 import type { Anchor, ModelSettings } from "../types";
 
+const councilMembersCount = () => councilMembersList().length;
 export const CHIPS = ["Why?", "How do you know?", "Example", "What if this is wrong?"];
 const CHIPS_KEY = "fractal.chipsOpen";
 
@@ -31,7 +33,10 @@ export function Composer({
   autoFocus,
   inputRef,
   onAsked,
-  extraButtons,
+  council,
+  onCouncilToggle,
+  onCouncilSettings,
+  forceModel,
 }: {
   sessionId?: string;
   parentId: string | null;
@@ -46,8 +51,12 @@ export function Composer({
   autoFocus?: boolean;
   inputRef?: React.RefObject<HTMLTextAreaElement | null>;
   onAsked?: (r: { cardId: string; sessionId: string }) => void;
-  /** e.g. the Council toggle */
-  extraButtons?: React.ReactNode;
+  /** LLM Council on for this question (the chairman then answers) */
+  council?: boolean;
+  onCouncilToggle?: () => void;
+  onCouncilSettings?: () => void;
+  /** switch the single model from outside ("Continue with this model") */
+  forceModel?: { id: string; n: number };
 }) {
   const { apiKey } = useStore(settingsStore);
   const [text, setText] = useState("");
@@ -65,6 +74,13 @@ export function Composer({
       setSettings(settingsFor(defaultModel));
     }
   }, [defaultModel]);
+
+  useEffect(() => {
+    if (forceModel?.id) {
+      setModel(forceModel.id);
+      setSettings(settingsFor(forceModel.id));
+    }
+  }, [forceModel?.id, forceModel?.n]);
 
   const grow = () => {
     const el = ta.current;
@@ -92,7 +108,9 @@ export function Composer({
     if (!apiKey) return setErr("Connect OpenRouter in Settings first.");
     if (!model) return setErr("Choose a model first.");
     setErr("");
-    const r = await ask({ sessionId, parentId, question, anchor, model, settings });
+    const chair = council ? councilChairman() : model;
+    if (council && !chair) return setErr("Choose a chairman in Settings › Council.");
+    const r = await ask({ sessionId, parentId, question, anchor, model: chair, settings: council ? settingsFor(chair) : settings, council });
     setText("");
     onClearAnchor?.();
     if (onAsked) onAsked(r);
@@ -148,7 +166,18 @@ export function Composer({
             <Icon name="help" />
           </button>
         )}
-        {extraButtons}
+        {onCouncilToggle && (
+          <>
+            <button type="button" className={`btn icon sm ${council ? "on" : ""}`} aria-label="Council" aria-pressed={!!council} onClick={onCouncilToggle} title="LLM Council">
+              <Icon name="council" />
+            </button>
+            {council && onCouncilSettings && (
+              <button type="button" className="btn icon xs" aria-label="Council settings" onClick={onCouncilSettings}>
+                ▾
+              </button>
+            )}
+          </>
+        )}
         <button type="button" className="btn icon sm" aria-label="Model settings" onClick={() => setOpen(true)}>
           <Icon name="settings" />
         </button>
@@ -163,6 +192,7 @@ export function Composer({
           Ask
         </button>
       )}
+      {council && <p className="muted small council-note">Council on: {`each member answers, they review each other, then the chairman writes the answer (about ${2 * councilMembersCount() + 2} model calls)`}</p>}
       {err && (
         <p className="error small" role="alert">
           {err} {!apiKey && <a href="#/settings/account">Open Settings</a>}

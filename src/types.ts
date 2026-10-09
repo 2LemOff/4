@@ -110,9 +110,43 @@ export interface Card {
   tag?: string;
   status: CardStatus;
   error?: string;
+  /** answered by the LLM Council (model = the chairman) */
+  mode?: "council";
+  council?: CouncilData;
   /** fresh-branch portals */
   portalFrom?: string;
   createdAt: number;
+}
+
+export interface CouncilMember {
+  label: string;
+  model: string;
+  status: "running" | "done" | "error";
+  content: string;
+  answer?: import("./answer").Answer;
+  error?: string;
+  usage?: Usage;
+}
+
+export interface CouncilReview {
+  model: string;
+  label: string;
+  evaluation: string;
+  ranking: string[];
+  error?: string;
+}
+
+export interface CouncilData {
+  stage: "members" | "reviews" | "chairman" | "checking" | "done" | "error";
+  chairman: string;
+  members: CouncilMember[];
+  reviews: CouncilReview[];
+  aggregate: { label: string; model: string; avgRank: number; votes: number }[];
+  verifier?: string;
+  /** chairman points that weren't found in the council's answers */
+  unsupported?: string[];
+  removed?: boolean;
+  chairmanReasoning?: string;
 }
 
 export interface Session {

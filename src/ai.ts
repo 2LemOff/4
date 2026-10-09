@@ -44,6 +44,8 @@ export interface AskOptions {
   anchor?: Anchor;
   model: string;
   settings: ModelSettings;
+  /** answer with the LLM Council (model is then the chairman) */
+  council?: boolean;
 }
 
 /** Create the card (and the session, for a first question) and start streaming. Returns immediately. */
@@ -80,6 +82,7 @@ export async function ask(o: AskOptions): Promise<{ cardId: string; sessionId: s
     blocks: [],
     model: o.model,
     modelSettings: o.settings,
+    mode: o.council ? "council" : undefined,
     status: "streaming",
     createdAt: now,
   };
@@ -92,6 +95,7 @@ export async function ask(o: AskOptions): Promise<{ cardId: string; sessionId: s
 export async function run(cardId: string, opts: { noSchema?: boolean } = {}): Promise<void> {
   const card = await db.cards.get(cardId);
   if (!card) return;
+  if (card.mode === "council") return (await import("./council")).runCouncil(cardId);
   const session = await db.sessions.get(card.sessionId);
   if (!session) return;
   const fail = async (message: string, status: Card["status"] = "error") => {

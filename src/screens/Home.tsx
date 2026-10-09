@@ -1,4 +1,7 @@
+import { useState } from "react";
 import { db } from "../db";
+import { CouncilEditor } from "../components/CouncilEditor";
+import { Sheet } from "../components/Sheet";
 import { roleModel } from "../ai";
 import { BookmarkList } from "../components/BookmarkList";
 import { Composer } from "../components/Composer";
@@ -10,6 +13,8 @@ const DAY = 24 * 3600 * 1000;
 export function Home() {
   const { apiKey, lastBackupAt, backupReminderDays } = useStore(settingsStore);
   useStore(modelsStore);
+  const [council, setCouncil] = useState(false);
+  const [sheet, setSheet] = useState(false);
   const sessions = useLive(() => db.sessions.orderBy("updatedAt").reverse().limit(20).toArray(), []);
   const overdue = !!sessions?.length && backupReminderDays > 0 && Date.now() - (lastBackupAt ?? 0) > backupReminderDays * DAY;
   return (
@@ -27,7 +32,30 @@ export function Home() {
           <a href="#/settings/storage">Back up now</a>
         </div>
       )}
-      <Composer parentId={null} placeholder="What do you want to understand?" defaultModel={roleModel("answer")} big autoFocus />
+      <Composer
+        parentId={null}
+        placeholder="What do you want to understand?"
+        defaultModel={roleModel("answer")}
+        big
+        autoFocus
+        council={council}
+        onCouncilToggle={() => setCouncil(!council)}
+        onCouncilSettings={() => setSheet(true)}
+        onAsked={(r) => {
+          try {
+            localStorage.setItem(`fractal.council.${r.sessionId}`, council ? "1" : "0");
+          } catch {
+            /* ignore */
+          }
+          go(hrefMap(r.sessionId, { focus: r.cardId }));
+        }}
+      />
+      {sheet && (
+        <Sheet title="LLM Council" onClose={() => setSheet(false)}>
+          <CouncilEditor />
+          <button className="btn primary" onClick={() => setSheet(false)}>Done</button>
+        </Sheet>
+      )}
       <BookmarkList />
       {!!sessions?.length && (
         <>

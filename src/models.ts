@@ -63,6 +63,11 @@ export function roleDefaults(models: ModelInfo[]): RoleDefaults {
   };
 }
 
+/** Default council: the newest Gemini Pro, Claude Opus, ChatGPT and Grok that exist. */
+export function councilDefaults(models: ModelInfo[]): string[] {
+  return (["gemini-pro", "claude-opus", "openai", "grok"] as PickerFamily[]).map((f) => newestOf(models, f)?.id).filter((x): x is string => !!x);
+}
+
 export function defaultEmbeddingModel(models: ModelInfo[]): string | undefined {
   return (
     models.find((m) => m.id === "openai/text-embedding-3-small")?.id ??

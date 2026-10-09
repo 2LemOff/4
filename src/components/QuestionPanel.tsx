@@ -5,6 +5,7 @@ import { ContextMeter } from "./ContextMeter";
 import { Icon } from "./Icon";
 import { shortName } from "./ModelPicker";
 import { ReasoningPanel } from "./ReasoningPanel";
+import { CouncilPanel } from "./CouncilPanel";
 
 /** Details of one question and its answer: model, cost, memory used, reasoning, errors and retries. */
 export function QuestionPanel({
@@ -16,6 +17,7 @@ export function QuestionPanel({
   childCards,
   onFresh,
   onFocusCard,
+  onContinue,
   onClose,
 }: {
   card: Card;
@@ -26,6 +28,7 @@ export function QuestionPanel({
   childCards: Card[];
   onFresh: () => void;
   onFocusCard: (id: string) => void;
+  onContinue: (model: string) => void;
   onClose: () => void;
 }) {
   const exhausted = card.error?.startsWith("Ran out of room");
@@ -33,7 +36,7 @@ export function QuestionPanel({
   return (
     <section className="panel" aria-label="Question">
       <div className="panel-head">
-        <span className="kind-badge">Question</span>
+        <span className="kind-badge">{card.mode === "council" ? "Council question" : "Question"}</span>
         <span className="grow" />
         <BookmarkButton on={bookmarked} sessionId={card.sessionId} cardId={card.id} label={card.tag ?? card.question} />
         <button className="btn icon sm" aria-label="Close" onClick={onClose}>
@@ -65,7 +68,8 @@ export function QuestionPanel({
           <button className="btn sm" onClick={() => retry(card.id)}>Retry</button>
         </div>
       )}
-      <ReasoningPanel assistant={card.assistant} live={streaming ? live?.reasoning : undefined} />
+      {card.council && <CouncilPanel council={card.council} onContinue={onContinue} />}
+      {!card.council && <ReasoningPanel assistant={card.assistant} live={streaming ? live?.reasoning : undefined} />}
       <p className="meta small muted">
         {shortName(card.model)}
         {card.usage?.cost !== undefined ? ` · $${card.usage.cost.toFixed(4)}` : ""}

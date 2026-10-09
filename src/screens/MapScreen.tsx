@@ -20,6 +20,7 @@ import { QuestionPanel } from "../components/QuestionPanel";
 import { SearchSheet } from "../components/SearchSheet";
 import { Sheet } from "../components/Sheet";
 import { SynthesisEditor } from "../components/SynthesisEditor";
+import { CouncilEditor } from "../components/CouncilEditor";
 import { settingsStore } from "../store";
 import type { Anchor, Card } from "../types";
 
@@ -53,6 +54,23 @@ export function MapScreen({ sid, focus, node, hl, view }: { sid: string; focus?:
   const [searchOpen, setSearchOpen] = useState(false);
   const [synthOpen, setSynthOpen] = useState(false);
   const [toast, setToast] = useState("");
+  const [councilOn, setCouncilOn] = useState(() => {
+    try {
+      return localStorage.getItem(`fractal.council.${sid}`) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const [councilSheet, setCouncilSheet] = useState(false);
+  const [forceModel, setForceModel] = useState<{ id: string; n: number } | undefined>();
+  const setCouncil = (on: boolean) => {
+    setCouncilOn(on);
+    try {
+      localStorage.setItem(`fractal.council.${sid}`, on ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+  };
   const mapRef = useRef<MapHandle>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -343,6 +361,10 @@ export function MapScreen({ sid, focus, node, hl, view }: { sid: string; focus?:
             bookmarked={bookmarkKeys.has(bookmarkKey(selCard.id))}
             childCards={children(idx, selCard.id)}
             onFresh={() => fresh(selCard.id)}
+            onContinue={(m) => {
+              setCouncil(false);
+              setForceModel({ id: m, n: Date.now() });
+            }}
             onFocusCard={(id) => (focusOn(id), setSel({ type: "question", cardId: id }))}
             onClose={() => setSel({ type: "none" })}
           />
@@ -356,6 +378,10 @@ export function MapScreen({ sid, focus, node, hl, view }: { sid: string; focus?:
           placeholder={anchor ? "Your question about this…" : "Ask about this answer…"}
           defaultModel={idx.get(parentId)?.model ?? roleModel("answer")}
           inputRef={inputRef}
+          council={councilOn}
+          onCouncilToggle={() => setCouncil(!councilOn)}
+          onCouncilSettings={() => setCouncilSheet(true)}
+          forceModel={forceModel}
           onAsked={(r) => {
             setSel({ type: "none" });
             setSelectMode(false);
@@ -402,6 +428,12 @@ export function MapScreen({ sid, focus, node, hl, view }: { sid: string; focus?:
       )}
       {synthOpen && <SynthSheet sid={sid} model={session.answerModel} onClose={() => setSynthOpen(false)} onStarted={() => setToast("Synthesizing in the background. See Library.")} />}
       {searchOpen && <SearchSheet onClose={() => setSearchOpen(false)} />}
+      {councilSheet && (
+        <Sheet title="LLM Council" onClose={() => setCouncilSheet(false)}>
+          <CouncilEditor />
+          <button className="btn primary" onClick={() => setCouncilSheet(false)}>Done</button>
+        </Sheet>
+      )}
     </>
   );
 }

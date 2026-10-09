@@ -256,3 +256,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); min-height: 32px
 .points { padding-left: 20px; }
 .points li { margin: 8px 0; }
 .src { min-height: 28px; min-width: 28px; padding: 0 8px; }
+.council summary, .member summary { cursor: pointer; min-height: 32px; display: flex; align-items: center; font-size: 0.9rem; }
+.member { margin: 4px 0; padding-left: 6px; border-left: 2px solid var(--line); }
+.council-note { margin: 4px 0 0; }

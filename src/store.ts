@@ -48,6 +48,16 @@ export interface AppSettings {
   synthesis: SynthesisSettings;
   /** models that answered 400 to a mid-conversation effort update */
   blockedConfigUpdate: string[];
+  council: {
+    /** empty = newest Gemini Pro, Claude Opus, ChatGPT and Grok */
+    members: string[];
+    /** empty = the answer model */
+    chairman: string;
+    peerReview: boolean;
+    /** empty = newest Gemini Flash */
+    verifier: string;
+    removeUnsupported: boolean;
+  };
   lastBackupAt?: number;
   /** remind after this many days without a backup (0 = never) */
   backupReminderDays: number;
@@ -61,6 +71,7 @@ export const defaultAppSettings = (): AppSettings => ({
   synthesis: DEFAULT_SYNTHESIS,
   blockedConfigUpdate: [],
   backupReminderDays: 7,
+  council: { members: [], chairman: "", peerReview: true, verifier: "", removeUnsupported: true },
 });
 
 export const settingsStore = createStore<AppSettings>(defaultAppSettings());
@@ -114,6 +125,7 @@ export async function initApp() {
   const saved = await kvGet<AppSettings>("settings");
   if (saved) {
     const merged = { ...defaultAppSettings(), ...saved };
+    merged.council = { ...defaultAppSettings().council, ...saved.council };
     // v1 prompts asked for blank-line paragraphs, which conflicts with the pyramid format
     merged.systemPrompt = merged.systemPrompt.replace(OLD_PREMISE_FORMAT, PROMPT_PARTS.premiseFormat);
     settingsStore.set(merged);
