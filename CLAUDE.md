@@ -31,7 +31,9 @@ Pure logic (`src/`, covered by `tests/`):
 - `openrouter.ts` is the whole network layer (plain `fetch`) plus `applyChunk`, the SSE accumulator.
 - `prompts.ts` holds the hidden system prompt, synthesis presets and the JSON schema for outlines. `effort.ts` plans mid-conversation effort changes. `context.ts` is the token meter and fresh-branch card. `search.ts` is cosine/keyword search. `route.ts` is the hash router.
 
-Orchestration: `ai.ts` (ask / run / retry, tags, embeddings, concept search, fresh branch), `synthesis.ts` (background outline jobs), `db.ts` + `store.ts` (Dexie tables, settings, models and live-stream stores, `useLive`). `screens/` and `components/` are the UI.
+Also pure: `answer.ts` (parse/normalize pyramid JSON, pyramids, outline text), `mapLayout.ts` (dagre graph), `councilLogic.ts` (rankings, grounding), `storyStyles.ts` (story/draw prompts, style presets, `sanitizeSvg`), `mediaSettings.ts` (OpenRouter image/video descriptors → controls, price estimates, video poll states).
+
+Orchestration: `ai.ts` (ask / run / retry, tags, embeddings, concept search, fresh branch), `council.ts` (members → reviews → grounded chairman → verifier), `stories.ts` (story text, SVG drawing, narration, screenshot style notes), `media.ts` (AI images, video jobs, image/video model metadata store), `synthesis.ts` (background outline jobs), `db.ts` + `store.ts` (Dexie tables, settings, models and live-stream stores, `useLive`). `screens/` and `components/` are the UI.
 
 ## Rules to keep
 
@@ -44,7 +46,9 @@ Orchestration: `ai.ts` (ask / run / retry, tags, embeddings, concept search, fre
 - The answer format section (`ANSWER_FORMAT` in `prompts.ts`) is appended to each new topic's frozen prompt; replay sends the stored JSON verbatim. v1 topics (prose answers, no format marker) still open: `cardAnswer()` converts paragraphs to a chain.
 - Search vectors are Int8 (cosine ignores scale); text-embedding-3 models are asked for 512 dimensions.
 - Storage: IndexedDB only (Dexie v2 adds bookmarks, stories, media). Nothing is deleted automatically; Settings › Storage lets the user pick files/topics. Backups are one zip (`backup.ts`, fflate) without the API key.
-- Synthesis runs in a module-level queue and its status is persisted; unfinished jobs resume on start (`resumePending`).
+- LLM Council: the chairman's answer must be grounded in the members' text (`sources` per node + verifier); replay sends the plain question and the final JSON, never council reasoning.
+- Stories are on demand only. SVG pictures go through `sanitizeSvg` and are shown only as `<img>` data URIs. Image/video settings and prices come from OpenRouter metadata (`/images/models` + endpoints, `/videos/models`); never hardcode model ids or parameters. Video costs are confirmed before submitting; jobs are persisted on the slide (`videoJob`) and `resumeVideos` polls them on start.
+- Synthesis runs in a module-level queue and its status is persisted; unfinished jobs resume on start (`resumePending`, `resumeStories`).
 
 ## Deployment
 

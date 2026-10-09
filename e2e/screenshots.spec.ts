@@ -32,6 +32,18 @@ test("capture each screen", async ({ page }) => {
   await page.getByRole("button", { name: "Outline" }).click();
   await page.waitForTimeout(300);
   await shot("7-outline");
+  await page.getByRole("button", { name: "Menu" }).click();
+  await page.getByRole("button", { name: /Learn as a story/ }).click();
+  await page.waitForTimeout(200);
+  await shot("9-story-start");
+  await page.getByRole("dialog", { name: "Learn as a story" }).getByRole("button", { name: "Make the story" }).click();
+  await page.locator(".story-pic img").waitFor();
+  await page.waitForTimeout(300);
+  await shot("10-story-player");
+  await page.goto("/#/settings/story");
+  await page.getByLabel("Video model").waitFor();
+  await page.waitForTimeout(300);
+  await shot("11-story-settings");
   await page.goto("/#/settings/storage");
   await page.waitForTimeout(300);
   await shot("8-storage");
