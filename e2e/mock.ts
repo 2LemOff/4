@@ -209,7 +209,6 @@ export async function mockOpenRouter(page: Page, opts: MockOptions = {}): Promis
         const ids = [...userText.matchAll(/^\[(K\d+\.n\d+)\]/gm)].map((m) => m[1]);
         return reply(JSON.stringify({ results: ids.map((id) => ({ id, supported: !id.endsWith(".n6"), quote: "" })) }));
       }
-      if (systemText.includes("topic tag")) return reply(JSON.stringify({ tag: `Tag ${calls.json.filter((b) => (b.messages?.[0]?.content ?? "").toString().includes("topic tag")).length}` }));
       if (userText.includes("Candidates:")) {
         const ids = [...userText.matchAll(/^\[(\w+)\]/gm)].map((m) => m[1]);
         return reply(JSON.stringify({ results: ids.slice(0, 2).map((id) => ({ id, why: "mentions observers" })) }));

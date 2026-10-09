@@ -2,7 +2,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { liveQuery } from "dexie";
 import { kvGet, kvSet } from "./db";
 import type { ModelInfo, ModelSettings, SynthesisSettings } from "./types";
-import { DEFAULT_SYNTHESIS, DEFAULT_SYSTEM_PROMPT, OLD_PREMISE_FORMAT, PROMPT_PARTS } from "./prompts";
+import { DEFAULT_SYNTHESIS, DEFAULT_SYSTEM_PROMPT, migrateSystemPrompt } from "./prompts";
 import { listModels } from "./openrouter";
 import { DEFAULT_STORY, type StorySettings } from "./storyStyles";
 
@@ -135,8 +135,8 @@ export async function initApp() {
     const merged = { ...defaultAppSettings(), ...saved };
     merged.council = { ...defaultAppSettings().council, ...saved.council };
     merged.story = { ...DEFAULT_STORY, ...saved.story };
-    // v1 prompts asked for blank-line paragraphs, which conflicts with the pyramid format
-    merged.systemPrompt = merged.systemPrompt.replace(OLD_PREMISE_FORMAT, PROMPT_PARTS.premiseFormat);
+    // older default prompts had more rules; only the current two are kept (plus anything the user wrote)
+    merged.systemPrompt = migrateSystemPrompt(merged.systemPrompt);
     settingsStore.set(merged);
   }
   const cached = await kvGet<ModelsState>("models");

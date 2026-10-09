@@ -97,7 +97,7 @@ function Models() {
     <section>
       <h2 className="section">Model per role</h2>
       {role("answer", "Answers", "Newest Gemini Pro by default. Can be changed per question.")}
-      {role("tags", "Tags and summaries", "Newest Gemini Flash by default.")}
+      {role("tags", "Summaries", "Used for fresh-branch summaries. Newest Gemini Flash by default.")}
       {role("rerank", "Search reranking", "Newest Claude Sonnet by default.")}
       <label className="field">
         <span className="field-label">Embeddings (search)</span>
@@ -121,10 +121,8 @@ function Models() {
 }
 
 const TOGGLE_LABELS: Record<keyof PromptToggles, string> = {
-  noWalls: "Directive 1: no walls of text, distinct premises",
-  firstPrinciples: "Directive 2: first principles",
-  premiseFormat: "Short premises: one claim each",
-  pushback: "Honest pushback",
+  premises: "Distinct, logical premises",
+  pushback: "Honest pushback when challenged",
 };
 
 function PromptSettings() {
@@ -133,7 +131,7 @@ function PromptSettings() {
   return (
     <section>
       <h2 className="section">Hidden system prompt</h2>
-      <p className="muted small">Sent with every question. Changes apply to <strong>new sessions</strong>; each session keeps the prompt it started with.</p>
+      <p className="muted small">Sent with every question. Changes apply to <strong>new topics</strong>; each topic keeps the prompt it started with.</p>
       {(Object.keys(PROMPT_PARTS) as (keyof PromptToggles)[]).map((k) => (
         <label key={k} className="check">
           <input type="checkbox" checked={toggles[k]} onChange={(e) => updateSettings({ systemPrompt: setToggle(systemPrompt, k, e.target.checked) })} />

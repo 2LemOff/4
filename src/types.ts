@@ -222,8 +222,6 @@ export interface MediaRecord {
 }
 
 export interface PromptToggles {
-  noWalls: boolean;
-  firstPrinciples: boolean;
-  premiseFormat: boolean;
+  premises: boolean;
   pushback: boolean;
 }

@@ -100,12 +100,12 @@ Everything is kept in the phone's browser storage (IndexedDB), and the app asks 
 
 ## The hidden system prompt (and how to change it)
 
-Every topic starts with a hidden system prompt containing two exact directives:
+Every topic starts with a hidden system prompt containing exactly two rules:
 
-1. "Never provide long, unbroken walls of text. Break answers into distinct, logical premises."
-2. "Speak in first principles. Assume the user will question the foundational logic of every claim you make."
+1. "Break answers into distinct, logical premises."
+2. "When the query challenges something you said, re-examine it honestly: concede plainly if you were wrong, defend it with reasons if you were right, and say so when you are unsure."
 
-It also has short-premise and honest-pushback rules. Edit it in **Settings › System prompt**, where each rule has a switch. A fixed **answer format** section (the pyramid JSON) is added after it and shown there read-only. Changes apply to **new** topics; a topic keeps the prompt it started with.
+Edit it in **Settings › System prompt**, where each rule has a switch and you can add your own text. A fixed **answer format** section (the pyramid JSON) is added after it and shown there read-only. Changes apply to **new** topics; a topic keeps the prompt it started with.
 
 ## Models and settings (OpenRouter)
 

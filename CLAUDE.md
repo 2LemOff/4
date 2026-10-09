@@ -37,7 +37,8 @@ Orchestration: `ai.ts` (ask / run / retry, tags, embeddings, concept search, fre
 
 ## Rules to keep
 
-- The system prompt's two directives are exact strings (`DIRECTIVE_1`, `DIRECTIVE_2` in `prompts.ts`); do not reword them. Each session stores a frozen copy of the prompt it started with; Settings edits only affect new sessions.
+- The editable system prompt is exactly two rules in the user's wording (`PREMISES`, `PUSHBACK` in `prompts.ts`); do not reword them or add others. Older saved prompts are migrated by `migrateSystemPrompt` (keeps the user's own text). Each topic stores a frozen copy of the prompt it started with; Settings edits only affect new topics.
+- No AI call is made for breadcrumb tags: the tag is the conclusion's title (or the question).
 - Never send both `reasoning.effort` and `reasoning.max_tokens`. Never send effort `none`. Keep `max_tokens` strictly above any reasoning budget (Claude).
 - `reasoning_details` from a response are stored unmodified and replayed unmodified, only on turns made by the same model as the current request.
 - Mid-conversation effort changes (`configuration_update` system messages) are stored on the card and must keep their position on every replay; never two in a row. A 400 about them marks the model in `blockedConfigUpdate` and the request retries without them.

@@ -1,30 +1,41 @@
 import { describe, expect, it } from "vitest";
 import {
-  ALL_ON, DEFAULT_SYNTHESIS, DEFAULT_SYSTEM_PROMPT, DIRECTIVE_1, DIRECTIVE_2, PRESET_PROMPTS,
+  ALL_ON, DEFAULT_SYNTHESIS, DEFAULT_SYSTEM_PROMPT, PREMISES, PRESET_PROMPTS, migrateSystemPrompt,
   composeSynthesisPrompt, composeSystemPrompt, detectToggles, outlineToMarkdown, serializeTree, setToggle,
 } from "../src/prompts";
 
 describe("system prompt", () => {
-  it("contains both directives verbatim", () => {
-    expect(DEFAULT_SYSTEM_PROMPT).toContain("Never provide long, unbroken walls of text. Break answers into distinct, logical premises.");
-    expect(DEFAULT_SYSTEM_PROMPT).toContain("Speak in first principles. Assume the user will question the foundational logic of every claim you make.");
-    expect(DIRECTIVE_1).toBe("Never provide long, unbroken walls of text. Break answers into distinct, logical premises.");
-    expect(DIRECTIVE_2).toBe("Speak in first principles. Assume the user will question the foundational logic of every claim you make.");
+  it("has exactly the two rules", () => {
+    expect(DEFAULT_SYSTEM_PROMPT).toBe(
+      "Break answers into distinct, logical premises.\n\nWhen the query challenges something you said, re-examine it honestly: concede plainly if you were wrong, defend it with reasons if you were right, and say so when you are unsure.",
+    );
+    expect(PREMISES).toBe("Break answers into distinct, logical premises.");
   });
   it("detects toggles from hand-edited text", () => {
     expect(detectToggles(DEFAULT_SYSTEM_PROMPT)).toEqual(ALL_ON);
-    expect(detectToggles("Just be nice.")).toEqual({ noWalls: false, firstPrinciples: false, premiseFormat: false, pushback: false });
+    expect(detectToggles("Just be nice.")).toEqual({ premises: false, pushback: false });
   });
   it("turns a rule off and on again", () => {
-    const off = setToggle(DEFAULT_SYSTEM_PROMPT, "firstPrinciples", false);
-    expect(off).not.toContain(DIRECTIVE_2);
-    expect(off).toContain(DIRECTIVE_1);
-    expect(off).not.toMatch(/\n{3,}/);
-    expect(detectToggles(setToggle(off, "firstPrinciples", true)).firstPrinciples).toBe(true);
+    const off = setToggle(DEFAULT_SYSTEM_PROMPT, "pushback", false);
+    expect(off).toBe(PREMISES);
+    expect(detectToggles(setToggle(off, "pushback", true)).pushback).toBe(true);
   });
   it("composes with extra text", () => {
     expect(composeSystemPrompt(ALL_ON, "Be brief.")).toMatch(/Be brief\.$/);
     expect(composeSystemPrompt({ ...ALL_ON, pushback: false })).not.toMatch(/re-examine/);
+  });
+  it("migrates older saved prompts to the two rules, keeping the user's own text", () => {
+    const old = [
+      "You are Fractal, a tutor for a learner who explores a subject by questioning every answer you give.",
+      "Never provide long, unbroken walls of text. Break answers into distinct, logical premises.",
+      "Speak in first principles. Assume the user will question the foundational logic of every claim you make.",
+      "Keep each premise short and self-contained: one claim per premise, stated plainly, with no filler.",
+      "When the learner challenges something you said, re-examine it honestly: concede plainly if you were wrong, defend it with reasons if you were right, and say so when you are unsure.",
+    ].join("\n\n");
+    expect(migrateSystemPrompt(old)).toBe(DEFAULT_SYSTEM_PROMPT);
+    expect(migrateSystemPrompt(`${old}\n\nAnswer in German.`)).toBe(`${DEFAULT_SYSTEM_PROMPT}\n\nAnswer in German.`);
+    expect(migrateSystemPrompt("My own prompt.")).toBe("My own prompt.");
+    expect(migrateSystemPrompt(DEFAULT_SYSTEM_PROMPT)).toBe(DEFAULT_SYSTEM_PROMPT);
   });
 });
 

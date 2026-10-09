@@ -8,7 +8,7 @@ import { planEffort } from "./effort";
 import { splitBlocks } from "./blocks";
 import { makeFreshCard } from "./context";
 import { defaultEmbeddingModel, roleDefaults } from "./models";
-import { rerankPrompt, SEED_PROMPT, sessionPrompt, TAG_PROMPT, usesPyramids } from "./prompts";
+import { rerankPrompt, SEED_PROMPT, sessionPrompt, usesPyramids } from "./prompts";
 import { ANSWER_SCHEMA, answerTitle, parseAnswer, prefixFor, pruneCrossLinks, textAnswer, type Answer } from "./answer";
 import { hitText, keywordSearch, quantize, topCards } from "./search";
 import type { Anchor, Card, ModelSettings, Session } from "./types";
@@ -198,31 +198,10 @@ function clearStream(id: string) {
   });
 }
 
-/** Background work after an answer: breadcrumb tag, then embeddings. Failures are silent: both are optional. */
+/** Background work after an answer: embeddings for search. Failures are silent: it's optional.
+ * (The breadcrumb tag is the conclusion's title; no extra AI call is made for it.) */
 async function afterAnswer(cardId: string) {
-  await generateTag(cardId).catch(() => {});
   await embedCards([cardId]).catch(() => {});
-}
-
-export async function generateTag(cardId: string) {
-  const card = await db.cards.get(cardId);
-  const id = roleModel("tags");
-  if (!card?.assistant || card.tag || !id || !apiKey()) return;
-  const m = modelInfo(id);
-  const extra = buildRequestParams({ reasoning: { effort: "low" }, max_tokens: 2000 }, m);
-  const { data } = await completeJSON<{ tag: string }>({
-    apiKey: apiKey(),
-    model: m,
-    messages: [
-      { role: "system", content: TAG_PROMPT },
-      { role: "user", content: `Q: ${card.question}\n\nA: ${card.blocks.join(" ").slice(0, 800)}` },
-    ],
-    schemaName: "tag",
-    schema: { type: "object", additionalProperties: false, required: ["tag"], properties: { tag: { type: "string" } } },
-    extra,
-  });
-  const tag = String(data.tag ?? "").trim().slice(0, 32);
-  if (tag) await db.cards.update(cardId, { tag });
 }
 
 const cardTexts = (c: Card) => [c.anchor?.text ?? c.question, ...c.blocks];

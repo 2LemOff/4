@@ -2,38 +2,44 @@ import type { OutlineSection, PromptToggles, SynthesisOptions, SynthesisPreset, 
 
 // ── System prompt ────────────────────────────────────────────────────────────
 
-/** The two exact directives. Do not reword. */
-export const DIRECTIVE_1 =
-  "Never provide long, unbroken walls of text. Break answers into distinct, logical premises.";
-export const DIRECTIVE_2 =
-  "Speak in first principles. Assume the user will question the foundational logic of every claim you make.";
-
-const INTRO =
-  "You are Fractal, a tutor for a learner who explores a subject by questioning every answer you give.";
-/** v1 wording, kept so saved prompts can be migrated */
-export const OLD_PREMISE_FORMAT =
-  "Write each premise as its own short paragraph of one to three sentences, with a blank line between paragraphs. Do not use headings, tables or long lists unless asked.";
-const PREMISE_FORMAT =
-  "Keep each premise short and self-contained: one claim per premise, stated plainly, with no filler.";
-const PUSHBACK =
-  "When the learner challenges something you said, re-examine it honestly: concede plainly if you were wrong, defend it with reasons if you were right, and say so when you are unsure.";
+/** The two rules of the hidden system prompt (the user's exact wording). */
+export const PREMISES = "Break answers into distinct, logical premises.";
+export const PUSHBACK =
+  "When the query challenges something you said, re-examine it honestly: concede plainly if you were wrong, defend it with reasons if you were right, and say so when you are unsure.";
 
 export const PROMPT_PARTS: Record<keyof PromptToggles, string> = {
-  noWalls: DIRECTIVE_1,
-  firstPrinciples: DIRECTIVE_2,
-  premiseFormat: PREMISE_FORMAT,
+  premises: PREMISES,
   pushback: PUSHBACK,
 };
-const PART_ORDER = ["noWalls", "firstPrinciples", "premiseFormat", "pushback"] as const;
+const PART_ORDER = ["premises", "pushback"] as const;
 
-export const ALL_ON: PromptToggles = { noWalls: true, firstPrinciples: true, premiseFormat: true, pushback: true };
+export const ALL_ON: PromptToggles = { premises: true, pushback: true };
 
 export function composeSystemPrompt(toggles: PromptToggles = ALL_ON, extra = ""): string {
-  const parts = [INTRO, ...PART_ORDER.filter((k) => toggles[k]).map((k) => PROMPT_PARTS[k])];
+  const parts = PART_ORDER.filter((k) => toggles[k]).map((k) => PROMPT_PARTS[k]);
   if (extra.trim()) parts.push(extra.trim());
   return parts.join("\n\n");
 }
 export const DEFAULT_SYSTEM_PROMPT = composeSystemPrompt();
+
+/** Rules from earlier versions of the default prompt, removed from saved settings on start. */
+const RETIRED_PARTS = [
+  "You are Fractal, a tutor for a learner who explores a subject by questioning every answer you give.",
+  "Never provide long, unbroken walls of text. Break answers into distinct, logical premises.",
+  "Speak in first principles. Assume the user will question the foundational logic of every claim you make.",
+  "Write each premise as its own short paragraph of one to three sentences, with a blank line between paragraphs. Do not use headings, tables or long lists unless asked.",
+  "Keep each premise short and self-contained: one claim per premise, stated plainly, with no filler.",
+  "When the learner challenges something you said, re-examine it honestly: concede plainly if you were wrong, defend it with reasons if you were right, and say so when you are unsure.",
+];
+
+/** Bring a saved prompt up to date: drop retired rules, keep anything the user wrote themselves. */
+export function migrateSystemPrompt(text: string): string {
+  if (!RETIRED_PARTS.some((p) => text.includes(p))) return text;
+  let extra = text;
+  for (const p of RETIRED_PARTS) extra = extra.replace(p, "");
+  for (const p of Object.values(PROMPT_PARTS)) extra = extra.replace(p, "");
+  return composeSystemPrompt(ALL_ON, extra.replace(/\n{3,}/g, "\n\n").trim());
+}
 
 /** Fixed (not editable) instructions for the pyramid answer format, added after the editable prompt. */
 export const ANSWER_FORMAT_MARKER = "Answer format (required).";
@@ -53,12 +59,7 @@ export const usesPyramids = (systemPrompt: string) => systemPrompt.includes(ANSW
 
 /** Which built-in rules are present in the (possibly hand-edited) text. */
 export function detectToggles(text: string): PromptToggles {
-  return {
-    noWalls: text.includes(DIRECTIVE_1),
-    firstPrinciples: text.includes(DIRECTIVE_2),
-    premiseFormat: text.includes(PREMISE_FORMAT),
-    pushback: text.includes(PUSHBACK),
-  };
+  return { premises: text.includes(PREMISES), pushback: text.includes(PUSHBACK) };
 }
 
 export function setToggle(text: string, key: keyof PromptToggles, on: boolean): string {
@@ -174,9 +175,6 @@ export const VERIFIER_PROMPT = `You check grounding. For each chairman point, de
 export function reviewPrompt(question: string, responses: string): string {
   return `You are evaluating different responses to the following question:\n\n${question}\n\nHere are the responses from different models (anonymized):\n\n${responses}\n\nYour task:\n1. Evaluate each response individually: what it does well and what it does poorly, focusing on accuracy and insight.\n2. Then rank them from best to worst.\n\nReply with JSON only: {"evaluation":"…","ranking":["Response C","Response A",…]}. If you cannot reply in JSON, end with a section "FINAL RANKING:" listing "1. Response X" lines.`;
 }
-
-export const TAG_PROMPT =
-  "Give a 2-4 word topic tag for the question and answer below. Reply with JSON only: {\"tag\": \"...\"}.";
 
 export const SEED_PROMPT =
   "Summarize the conversation below in under 150 words so it can be continued in a fresh thread. Keep the definitions and conclusions reached. Reply with plain text only.";

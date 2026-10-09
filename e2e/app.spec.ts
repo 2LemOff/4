@@ -13,8 +13,8 @@ test.describe("pyramid map", () => {
     await connect(page);
     await askRoot(page, "Why is the sky blue?");
     const first = calls.stream[0];
-    expect(first.messages[0].content).toContain("Never provide long, unbroken walls of text. Break answers into distinct, logical premises.");
-    expect(first.messages[0].content).toContain("Speak in first principles. Assume the user will question the foundational logic of every claim you make.");
+    expect(first.messages[0].content).toMatch(/^Break answers into distinct, logical premises\.\n\nWhen the query challenges something you said, re-examine it honestly/);
+    expect(first.messages[0].content).not.toContain("first principles. Assume");
     expect(first.messages[0].content).toContain("Answer format (required).");
     expect(first.messages.at(-1).content).toBe("Why is the sky blue?\n\n(Answer id prefix: K1)");
     expect(first.response_format.json_schema.name).toBe("pyramid_answer");
@@ -276,12 +276,12 @@ test.describe("limits, prompts and synthesis", () => {
     await connect(page);
     await askRoot(page, "First topic");
     await page.goto("/#/settings/prompt");
-    await page.getByLabel("Directive 2: first principles").uncheck();
+    await page.getByLabel("Honest pushback when challenged").uncheck();
     await expect(page.getByText("Answer format (fixed, added after your prompt)")).toBeVisible();
     await page.goto("/#/");
     await askRoot(page, "Second topic");
-    expect(calls.stream[0].messages[0].content).toContain("Speak in first principles");
-    expect(calls.stream[1].messages[0].content).not.toContain("Speak in first principles");
+    expect(calls.stream[0].messages[0].content).toContain("When the query challenges");
+    expect(calls.stream[1].messages[0].content).not.toContain("When the query challenges");
     expect(calls.stream[1].messages[0].content).toContain("Answer format (required).");
   });
 
