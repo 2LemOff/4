@@ -317,3 +317,69 @@ export async function exchangeCode(code: string, verifier: string): Promise<stri
   if (!res.ok) throw await failure(res);
   return (await res.json()).key as string;
 }
+
+// ── Images, video ────────────────────────────────────────────────────────────
+
+/** Image-capable models with their typed parameter descriptors. */
+export async function listImageModels(): Promise<{ id: string; name?: string; supported_parameters?: unknown; [k: string]: unknown }[]> {
+  const res = await fetch(`${API}/images/models`);
+  if (!res.ok) throw await failure(res);
+  const j = await res.json();
+  return j.data ?? j.models ?? [];
+}
+
+/** Per-provider records: exact accepted parameters, passthrough keys and pricing. */
+export async function imageModelEndpoints(model: string): Promise<{ supported_parameters?: unknown; pricing?: unknown; allowed_passthrough_parameters?: string[]; [k: string]: unknown }[]> {
+  const res = await fetch(`${API}/images/models/${model}/endpoints`);
+  if (!res.ok) throw await failure(res);
+  const j = await res.json();
+  const d = j.data ?? j;
+  return Array.isArray(d) ? d : d.endpoints ?? [];
+}
+
+/** POST /images; the buffered result is data[0].b64_json (or a url). */
+export async function generateImage(apiKey: string, body: Record<string, unknown>): Promise<Blob> {
+  const res = await fetch(`${API}/images`, { method: "POST", headers: headers(apiKey), body: JSON.stringify(body) });
+  if (!res.ok) throw await failure(res);
+  const j = await res.json();
+  const first = j.data?.[0] ?? {};
+  if (first.b64_json) {
+    const bin = atob(first.b64_json);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new Blob([bytes], { type: first.mime_type ?? (bin.startsWith("<svg") || bin.startsWith("<?xml") ? "image/svg+xml" : "image/png") });
+  }
+  if (first.url) {
+    const r = await fetch(first.url);
+    if (!r.ok) throw new OpenRouterError("The image couldn't be downloaded.", r.status);
+    return r.blob();
+  }
+  throw new OpenRouterError("No image came back.", 500);
+}
+
+export async function listVideoModels(): Promise<import("./mediaSettings").VideoModel[]> {
+  const res = await fetch(`${API}/videos/models`);
+  if (!res.ok) throw await failure(res);
+  const j = await res.json();
+  return j.data ?? [];
+}
+
+export interface VideoJob {
+  id: string;
+  status: string;
+  unsigned_urls?: string[];
+  error?: string | { message?: string };
+  usage?: { cost?: number };
+}
+
+export async function submitVideo(apiKey: string, body: Record<string, unknown>): Promise<VideoJob> {
+  const res = await fetch(`${API}/videos`, { method: "POST", headers: headers(apiKey), body: JSON.stringify(body) });
+  if (!res.ok) throw await failure(res);
+  return res.json();
+}
+
+export async function getVideo(apiKey: string, id: string): Promise<VideoJob> {
+  const res = await fetch(`${API}/videos/${id}`, { headers: headers(apiKey) });
+  if (!res.ok) throw await failure(res);
+  return res.json();
+}

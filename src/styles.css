@@ -275,3 +275,5 @@ input[type="range"] { width: 100%; accent-color: var(--accent); min-height: 32px
 .caption-line:active { background: var(--surface2); }
 .dock.story-controls { flex-direction: row; align-items: center; }
 .btn.icon.primary { background: var(--accent); color: var(--accent-ink); }
+.story-pic video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.story-kind { margin-top: 8px; }

@@ -5,7 +5,9 @@ import { STORY_STYLES, svgDataUri, type StyleId } from "../storyStyles";
 import { go, hrefMap } from "../route";
 import { settingsStore, updateSettings, useLive, useStore } from "../store";
 import { Icon } from "../components/Icon";
-import type { StorySlide } from "../storyTypes";
+import type { PictureType, StorySlide } from "../storyTypes";
+import { imageSetup, imageSlide, loadMediaModels, mediaStore, setPicture, videoSetup, videoSlide } from "../media";
+import { formatPrice } from "../mediaSettings";
 
 const SPEEDS = [0.75, 1, 1.25, 1.5, 2];
 
@@ -21,6 +23,17 @@ export function StoryScreen({ id }: { id: string }) {
   const [playing, setPlaying] = useState(false);
   const audio = useRef<HTMLAudioElement>(null);
   const slide = story?.slides[i];
+
+  const media = useStore(mediaStore);
+  const picBlob = useLive(async () => {
+    const mid = slide?.picture === "image" ? slide.imageId : slide?.picture === "video" ? slide.videoId : undefined;
+    return mid ? (await db.media.get(mid))?.blob : undefined;
+  }, [slide?.picture, slide?.imageId, slide?.videoId]);
+  const picUrl = useMemo(() => (picBlob ? URL.createObjectURL(picBlob) : undefined), [picBlob]);
+  useEffect(() => () => void (picUrl && URL.revokeObjectURL(picUrl)), [picUrl]);
+  useEffect(() => {
+    if (slide && slide.picture !== "shapes") void loadMediaModels();
+  }, [slide?.picture]);
 
   const audioBlob = useLive(async () => (slide?.audioId ? (await db.media.get(slide.audioId))?.blob : undefined), [slide?.audioId]);
   const audioUrl = useMemo(() => (audioBlob ? URL.createObjectURL(audioBlob) : undefined), [audioBlob]);
@@ -104,7 +117,20 @@ export function StoryScreen({ id }: { id: string }) {
 
   const s = slide!;
   const busy = (st: string) => st === "running" || (st === "pending" && story.status === "running");
-  const pictureMissing = !s.svg && !busy(s.pictureStatus);
+  const has = { shapes: !!s.svg, image: !!s.imageId, video: !!(s.videoId || s.videoUrl) } as Record<PictureType, boolean>;
+  const pictureMissing = !has[s.picture] && !busy(s.pictureStatus);
+  void media; // re-render when model metadata arrives (prices)
+  const img = imageSetup();
+  const vid = videoSetup();
+  const makeVideo = () => {
+    const secs = vid.values.duration ? `${vid.values.duration}s ` : "";
+    if (confirm(`Make a ${secs}video for this slide with ${vid.model.split("/").pop()}? Estimated cost: ${formatPrice(vid.price)}.`)) void videoSlide(story.id, i);
+  };
+  const regenerate = () => (s.picture === "image" ? imageSlide(story.id, i, true) : s.picture === "video" ? makeVideo() : drawSlide(story.id, i, true));
+  const missingLabel =
+    s.picture === "image" ? `Generate AI image · ${formatPrice(img.price)}` : s.picture === "video" ? `Generate video · ${formatPrice(vid.price)}` : "Regenerate picture";
+  const working = busy(s.pictureStatus) || (s.picture === "video" && !!s.videoJob);
+  const waitText = s.picture === "video" ? `Making the video${s.videoJob ? ` (${s.videoJob.status.replace("_", " ")})` : ""}… You can leave; it continues later.` : s.picture === "image" ? "Painting the image…" : "Drawing the picture…";
   const voiceMissing = !s.audioId && !busy(s.audioStatus);
 
   return (
@@ -112,14 +138,25 @@ export function StoryScreen({ id }: { id: string }) {
       {head}
       <div className="story scroll">
         <figure className="story-pic">
-          {s.svg ? (
+          {s.picture === "video" && has.video && !working ? (
+            <video key={picUrl ?? s.videoUrl} src={picUrl ?? s.videoUrl} muted={!cfg.videoSound} loop autoPlay playsInline aria-label={s.visual} />
+          ) : s.picture === "image" && picUrl && !working ? (
+            <img key={picUrl} className={playing ? "kb" : "kb paused"} src={picUrl} alt={s.visual} />
+          ) : s.picture === "shapes" && s.svg && !working ? (
             <img key={`${i}-${s.svg.length}`} className={playing ? "kb" : "kb paused"} src={svgDataUri(s.svg)} alt={s.visual} />
           ) : (
             <div className="story-placeholder muted small" role="status">
-              {busy(s.pictureStatus) ? "Drawing the picture…" : s.pictureError ?? "No picture yet."}
+              {working ? waitText : s.pictureStatus === "error" && s.pictureError ? s.pictureError : "No picture yet."}
             </div>
           )}
         </figure>
+        <div className="seg story-kind" role="group" aria-label="Picture type">
+          {(["shapes", "image", "video"] as PictureType[]).map((k) => (
+            <button key={k} className={s.picture === k ? "on" : ""} aria-pressed={s.picture === k} disabled={working} onClick={() => setPicture(story.id, i, k)}>
+              {k === "shapes" ? "Shapes" : k === "image" ? "AI image" : "AI video"}
+            </button>
+          ))}
+        </div>
         <p className="muted small story-count">
           Slide {i + 1} of {story.slides.length} · {s.heading}
         </p>
@@ -133,7 +170,7 @@ export function StoryScreen({ id }: { id: string }) {
         <p className="muted small">Tap a sentence to ask about it.</p>
         {(pictureMissing || voiceMissing) && (
           <div className="chips">
-            {pictureMissing && <button className="btn chip" onClick={() => drawSlide(story.id, i, true)}>Regenerate picture</button>}
+            {pictureMissing && <button className="btn chip" onClick={regenerate}>{missingLabel}</button>}
             {voiceMissing && <button className="btn chip" onClick={() => narrateSlide(story.id, i, true)}>Regenerate narration</button>}
           </div>
         )}
@@ -142,7 +179,7 @@ export function StoryScreen({ id }: { id: string }) {
           <details className="group">
             <summary className="small">Slide options</summary>
             <div className="chips">
-              <button className="btn chip" disabled={busy(s.pictureStatus)} onClick={() => drawSlide(story.id, i, true)}>Redraw picture</button>
+              <button className="btn chip" disabled={working} onClick={regenerate}>{s.picture === "shapes" ? "Redraw picture" : s.picture === "image" ? "New AI image" : "New video"}</button>
               <button className="btn chip" disabled={busy(s.audioStatus)} onClick={() => narrateSlide(story.id, i, true)}>Record narration again</button>
             </div>
           </details>

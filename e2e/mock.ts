@@ -47,6 +47,33 @@ export const MODELS = [
 const SPEECH_MODELS = [{ id: "openai/gpt-4o-mini-tts", created: 2, architecture: { output_modalities: ["speech"] } }];
 /** A tiny SVG per scene, with a script and handler the app must strip. */
 export const SCENE_SVG = '<svg viewBox="0 0 400 300"><script>alert(1)</script><rect width="400" height="300" fill="#fde" onclick="x()"/><circle cx="200" cy="150" r="60" fill="#36c"/></svg>';
+export const IMAGE_MODELS = [
+  {
+    id: "acme/painter-2", name: "Painter 2", created: 5,
+    supported_parameters: {
+      aspect_ratio: { type: "enum", values: ["1:1", "4:3", "16:9"] },
+      resolution: { type: "enum", values: ["1K", "2K"] },
+      n: { type: "range", min: 1, max: 4 },
+      input_references: { type: "range", min: 0, max: 4 },
+    },
+  },
+];
+export const IMAGE_ENDPOINTS = {
+  data: {
+    id: "acme/painter-2",
+    endpoints: [{ provider_name: "Acme", supported_parameters: { aspect_ratio: { type: "enum", values: ["1:1", "4:3"] }, resolution: { type: "enum", values: ["1K", "2K"] }, input_references: { type: "range", min: 0, max: 4 } }, pricing: { image: "0.04" } }],
+  },
+};
+export const VIDEO_MODELS = [
+  {
+    id: "acme/film-1", name: "Film 1", created: 6,
+    supported_durations: [4, 8], supported_resolutions: ["720p", "1080p"], supported_aspect_ratios: ["16:9", "4:3"], supported_sizes: null,
+    generate_audio: true,
+    pricing_skus: { "per-video-second": "0.40", "per-video-second-1080p": "0.60", "per-video-second-no-audio": "0.20" },
+  },
+];
+/** 1x1 PNG */
+export const PNG_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 const EMBED_MODELS = [{ id: "openai/text-embedding-3-small", created: 1, architecture: { output_modalities: ["embeddings"] } }];
 
 /** Deterministic character-trigram embedding so "observers" lands near "observer". */
@@ -74,6 +101,9 @@ export interface Calls {
   json: any[];
   embeddings: any[];
   speech: any[];
+  images: any[];
+  videos: any[];
+  polls: number;
 }
 
 /** A pyramid answer in the app's JSON format, using the id prefix the app sends. Later answers build on K1.n2. */
@@ -99,7 +129,7 @@ export function pyramidAnswer(prefix: string): string {
 const ANSWER = "Premise one is simple.\n\nPremise two depends on it. It has a second sentence about observers.\n\nPremise three concludes.";
 
 export async function mockOpenRouter(page: Page, opts: MockOptions = {}): Promise<Calls> {
-  const calls: Calls = { chat: [], stream: [], json: [], embeddings: [], speech: [] };
+  const calls: Calls = { chat: [], stream: [], json: [], embeddings: [], speech: [], images: [], videos: [], polls: 0 };
   let n = 0;
   await page.route(/https:\/\/openrouter\.ai\/api\/v1\/.*/, async (route: Route) => {
     const req = route.request();
@@ -107,7 +137,7 @@ export async function mockOpenRouter(page: Page, opts: MockOptions = {}): Promis
     const url = new URL(req.url());
     const json = (data: unknown) => route.fulfill({ status: 200, headers: { ...CORS, "content-type": "application/json" }, body: JSON.stringify(data) });
 
-    if (url.pathname.endsWith("/models")) {
+    if (url.pathname.endsWith("/v1/models")) {
       const out = url.searchParams.get("output_modalities");
       return json({ data: out === "embeddings" ? EMBED_MODELS : out === "speech" ? SPEECH_MODELS : out ? [] : MODELS });
     }
@@ -115,6 +145,22 @@ export async function mockOpenRouter(page: Page, opts: MockOptions = {}): Promis
       const body = req.postDataJSON();
       calls.embeddings.push(body);
       return json({ data: body.input.map((t: string, index: number) => ({ index, embedding: fakeEmbed(t) })) });
+    }
+    if (url.pathname.endsWith("/images/models")) return json({ data: IMAGE_MODELS });
+    if (/\/images\/models\/.+\/endpoints$/.test(url.pathname)) return json(IMAGE_ENDPOINTS);
+    if (url.pathname.endsWith("/images")) {
+      calls.images.push(req.postDataJSON());
+      return json({ data: [{ b64_json: PNG_B64 }] });
+    }
+    if (url.pathname.endsWith("/videos/models")) return json({ data: VIDEO_MODELS });
+    if (url.pathname.endsWith("/videos") && req.method() === "POST") {
+      calls.videos.push(req.postDataJSON());
+      return json({ id: "vid-1", status: "pending", polling_url: "https://openrouter.ai/api/v1/videos/vid-1" });
+    }
+    if (url.pathname.endsWith("/videos/vid-1/content")) return route.fulfill({ status: 200, headers: { ...CORS, "content-type": "video/mp4" }, body: Buffer.from([0, 0, 0, 24, 102, 116, 121, 112]) });
+    if (url.pathname.endsWith("/videos/vid-1")) {
+      calls.polls++;
+      return json(calls.polls < 2 ? { id: "vid-1", status: "in_progress" } : { id: "vid-1", status: "completed", unsigned_urls: ["https://openrouter.ai/api/v1/videos/vid-1/content"] });
     }
     if (url.pathname.endsWith("/audio/speech")) {
       calls.speech.push(req.postDataJSON());

@@ -8,6 +8,7 @@ import { newestOf } from "./models";
 import { indexCards, pathToRoot } from "./tree";
 import { drawPrompt, normalizeStory, sanitizeSvg, STORY_SCHEMA, storyPrompt, type StyleId } from "./storyStyles";
 import type { Story, StoryScope, StorySlide } from "./storyTypes";
+import { imageSlide, patchSlide, resumeVideos } from "./media";
 
 const key = () => settingsStore.get().apiKey;
 const cfg = () => settingsStore.get().story;
@@ -86,12 +87,12 @@ export async function runStory(id: string): Promise<void> {
         extra: buildRequestParams({ ...settingsFor(modelId), max_tokens: 12000 }, model),
       });
       const s = normalizeStory(data, cfg().slides);
-      const slides: StorySlide[] = s.slides.map((x) => ({ ...x, picture: "shapes", pictureStatus: "pending", audioStatus: "pending" }));
+      const slides: StorySlide[] = s.slides.map((x) => ({ ...x, picture: cfg().picture, pictureStatus: "pending", audioStatus: "pending" }));
       await db.stories.update(id, { title: s.title, scenario: s.scenario, slides });
       story = (await db.stories.get(id))!;
     }
     await db.stories.update(id, { status: "running" });
-    await Promise.all(story.slides.map((_, i) => Promise.all([drawSlide(id, i), narrateSlide(id, i)])));
+    await Promise.all(story.slides.map((s, i) => Promise.all([s.picture === "image" ? imageSlide(id, i) : drawSlide(id, i), narrateSlide(id, i)])));
     const done = (await db.stories.get(id))!;
     const failed = done.slides.some((s) => s.pictureStatus === "error" || s.audioStatus === "error");
     await db.stories.update(id, { status: failed ? "error" : "done", error: failed ? "Some pictures or narration failed. Tap Regenerate on that slide." : undefined });
@@ -102,21 +103,12 @@ export async function runStory(id: string): Promise<void> {
   }
 }
 
-async function patchSlide(id: string, i: number, patch: Partial<StorySlide>) {
-  await db.transaction("rw", db.stories, async () => {
-    const st = await db.stories.get(id);
-    if (!st?.slides[i]) return;
-    st.slides[i] = { ...st.slides[i], ...patch };
-    await db.stories.put(st);
-  });
-}
-
-/** Shapes drawn by the drawing model as a sanitized SVG. (AI images and video are handled in media.ts.) */
+/** Shapes drawn by the drawing model as a sanitized SVG. (AI images and video are in media.ts.) */
 export async function drawSlide(id: string, i: number, force = false): Promise<void> {
   const st = await db.stories.get(id);
   const slide = st?.slides[i];
-  if (!st || !slide || slide.picture !== "shapes" || (slide.pictureStatus === "done" && slide.svg && !force)) return;
-  await patchSlide(id, i, { pictureStatus: "running", pictureError: undefined });
+  if (!st || !slide || (!force && (slide.picture !== "shapes" || (slide.pictureStatus === "done" && slide.svg)))) return;
+  await patchSlide(id, i, { picture: "shapes", pictureStatus: "running", pictureError: undefined });
   try {
     const m = modelInfo(drawModel());
     const text = await completeText({
@@ -175,4 +167,5 @@ export async function styleFromScreenshots(dataUrls: string[]): Promise<string> 
 export async function resumeStories(): Promise<void> {
   const open = (await db.stories.toArray()).filter((s) => s.status === "pending" || s.status === "running");
   for (const s of open) void runStory(s.id);
+  void resumeVideos();
 }

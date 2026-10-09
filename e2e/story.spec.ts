@@ -116,3 +116,54 @@ test.describe("Story slides", () => {
     await expect(page.getByRole("button", { name: "Regenerate narration" })).toHaveCount(0);
   });
 });
+
+test.describe("Story AI pictures", () => {
+  test("image and video settings come from OpenRouter, prices show first, and a video job resumes after a reload", async ({ page }) => {
+    const calls = await mockOpenRouter(page);
+    await connect(page);
+    await page.goto("/#/settings/story");
+    // settings built from /images/models and the endpoint record (the endpoint narrows aspect ratios)
+    await expect(page.getByLabel("Image model")).toHaveValue("acme/painter-2");
+    await expect(page.getByLabel("Aspect ratio").first().locator("option")).toHaveText(["1:1", "4:3"]);
+    await expect(page.getByLabel("Image price")).toHaveText("Estimated cost per image: about $0.04");
+    await expect(page.getByLabel("Video model")).toHaveValue("acme/film-1");
+    await page.getByLabel("Duration (seconds)").selectOption("8");
+    await page.getByLabel("Generate sound").check();
+    await expect(page.getByLabel("Video price")).toHaveText("Estimated cost per clip: about $3.20");
+    await page.getByLabel("Duration (seconds)").selectOption("4");
+
+    await page.goto("/#/");
+    await askRoot(page, "Why is the sky blue?");
+    await page.getByRole("button", { name: "Menu" }).click();
+    await page.getByRole("button", { name: /Learn as a story/ }).click();
+    await page.getByRole("dialog", { name: "Learn as a story" }).getByRole("button", { name: "Make the story" }).click();
+    await expect(page.locator(".story-pic img")).toBeVisible();
+
+    // AI image for this slide, saved as a file
+    const kinds = page.getByRole("group", { name: "Picture type" });
+    await kinds.getByRole("button", { name: "AI image" }).click();
+    await page.getByRole("button", { name: /Generate AI image · about \$0\.04/ }).click();
+    await expect.poll(() => calls.images.length).toBe(1);
+    expect(calls.images[0]).toMatchObject({ model: "acme/painter-2", aspect_ratio: "4:3", resolution: "1K" });
+    expect(calls.images[0].n).toBeUndefined();
+    expect(calls.images[0].prompt).toContain("A sky, scene 1.");
+    await expect(page.locator(".story-pic img")).toHaveAttribute("src", /^blob:/);
+
+    // video: price confirmed first, then polled; reload in the middle and it still finishes
+    await kinds.getByRole("button", { name: "AI video" }).click();
+    let asked = "";
+    page.once("dialog", (d) => ((asked = d.message()), d.accept()));
+    await page.getByRole("button", { name: /Generate video · about \$1\.60/ }).click();
+    await expect.poll(() => calls.videos.length).toBe(1);
+    expect(asked).toContain("Estimated cost: about $1.60");
+    expect(calls.videos[0]).toMatchObject({ model: "acme/film-1", duration: 4, generate_audio: true });
+    await expect(page.getByText(/Making the video/)).toBeVisible();
+    await page.reload();
+    await expect(page.locator(".story-pic video")).toBeVisible({ timeout: 15000 });
+    expect(calls.polls).toBeGreaterThanOrEqual(2);
+
+    await page.goto("/#/settings/storage");
+    await expect(page.getByText(/image 1/)).toBeVisible();
+    await expect(page.getByText(/video 1/)).toBeVisible();
+  });
+});

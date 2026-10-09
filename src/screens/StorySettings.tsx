@@ -1,8 +1,11 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { drawModel, previewVoice, styleFromScreenshots, visionModel, voiceModel } from "../stories";
 import { LOOKS, STORY_STYLES, type LookId, type StorySettings as Cfg, type StyleId } from "../storyStyles";
 import { modelsStore, settingsStore, updateSettings, useStore } from "../store";
 import { ModelPicker } from "../components/ModelPicker";
+import { MediaControls } from "../components/MediaControls";
+import { imageSetup, loadEndpoints, loadMediaModels, mediaStore, videoSetup } from "../media";
+import { formatPrice } from "../mediaSettings";
 
 /** Common text-to-speech voice names, offered as suggestions; any name the voice model accepts can be typed. */
 const VOICES = ["alloy", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer", "verse"];
@@ -37,7 +40,7 @@ export function StorySettings() {
     try {
       const urls = await Promise.all([...list].slice(0, 4).map(toDataUrl));
       const text = await styleFromScreenshots(urls);
-      set({ notes: { ...s.notes, [styleId]: text } });
+      set({ notes: { ...s.notes, [styleId]: text }, refImages: urls });
     } catch (e) {
       setMsg(e instanceof Error ? e.message : String(e));
     } finally {
@@ -110,7 +113,11 @@ export function StorySettings() {
       </div>
 
       <h2 className="section">Pictures</h2>
-      <p className="muted small">Shapes drawn by AI as a small vector picture (SVG).</p>
+      <div className="seg" role="group" aria-label="Pictures in new stories">
+        <button className={s.picture === "shapes" ? "on" : ""} aria-pressed={s.picture === "shapes"} onClick={() => set({ picture: "shapes" })}>Shapes drawn by AI</button>
+        <button className={s.picture === "image" ? "on" : ""} aria-pressed={s.picture === "image"} onClick={() => set({ picture: "image" })}>AI images</button>
+      </div>
+      <p className="muted small">Shapes are a small vector picture (SVG) and cost almost nothing. AI images and videos can also be chosen per slide in the player.</p>
       <label className="field">
         <span className="field-label">Look</span>
         <select className="input" value={s.look} onChange={(e) => set({ look: e.target.value as LookId })} aria-label="Picture look">
@@ -136,6 +143,8 @@ export function StorySettings() {
           ))}
         </div>
       </div>
+
+      <MediaSettings />
 
       <h2 className="section">Voice</h2>
       <label className="field">
@@ -172,5 +181,54 @@ export function StorySettings() {
       {busy && <p className="muted small" role="status">{busy}</p>}
       {msg && <p className="small" role="status">{msg}</p>}
     </section>
+  );
+}
+
+/** AI image and video models and their settings, pulled from OpenRouter, with an estimated price. */
+function MediaSettings() {
+  const { story: s } = useStore(settingsStore);
+  const media = useStore(mediaStore);
+  const set = (p: Partial<Cfg>) => updateSettings((x) => ({ story: { ...x.story, ...p } }));
+  useEffect(() => void loadMediaModels(), []);
+  const img = imageSetup();
+  const vid = videoSetup();
+  useEffect(() => void loadEndpoints(img.model), [img.model]);
+
+  if (media.loading && !media.loaded) return <p className="muted small">Loading image and video models…</p>;
+  return (
+    <>
+      <h2 className="section">AI images</h2>
+      <label className="field">
+        <span className="field-label">Image model</span>
+        <select className="input" aria-label="Image model" value={img.model} onChange={(e) => set({ imageModel: e.target.value })}>
+          {!media.imageModels.length && <option value="">None available</option>}
+          {media.imageModels.map((m) => <option key={m.id} value={m.id}>{m.name ?? m.id}</option>)}
+        </select>
+      </label>
+      <MediaControls controls={img.controls} values={img.values} onChange={(k, v) => set({ imageParams: { ...s.imageParams, [k]: v } })} />
+      <p className="small" aria-label="Image price">Estimated cost per image: {formatPrice(img.price)}</p>
+      {img.maxRefs > 0 && s.refImages.length > 0 && (
+        <label className="check">
+          <input type="checkbox" checked={s.useRefs} onChange={(e) => set({ useRefs: e.target.checked })} />
+          <span>Send my style screenshots as references ({Math.min(s.refImages.length, img.maxRefs)})</span>
+        </label>
+      )}
+
+      <h2 className="section">AI video (opt-in per slide)</h2>
+      <label className="field">
+        <span className="field-label">Video model</span>
+        <select className="input" aria-label="Video model" value={vid.model} onChange={(e) => set({ videoModel: e.target.value })}>
+          {!media.videoModels.length && <option value="">None available</option>}
+          {media.videoModels.map((m) => <option key={m.id} value={m.id}>{m.name ?? m.id}</option>)}
+        </select>
+      </label>
+      <MediaControls controls={vid.controls} values={vid.values} onChange={(k, v) => set({ videoParams: { ...s.videoParams, [k]: v } })} />
+      <p className="small" aria-label="Video price">Estimated cost per clip: {formatPrice(vid.price)}</p>
+      <label className="check">
+        <input type="checkbox" checked={s.videoSound} onChange={(e) => set({ videoSound: e.target.checked })} />
+        <span>Play the video's own sound (otherwise muted under the narration)</span>
+      </label>
+      {media.error && <p className="error small">{media.error} <button className="btn chip" onClick={() => loadMediaModels(true)}>Retry</button></p>}
+    </>
   );
 }

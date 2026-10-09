@@ -56,6 +56,11 @@ export interface StorySettings {
   imageParams: Record<string, unknown>;
   videoModel: string;
   videoParams: Record<string, unknown>;
+  /** play the clip's own sound instead of muting it under the narration */
+  videoSound: boolean;
+  /** the latest style screenshots (small JPEG data URLs), for image models that accept references */
+  refImages: string[];
+  useRefs: boolean;
 }
 
 export const DEFAULT_STORY: StorySettings = {
@@ -77,6 +82,9 @@ export const DEFAULT_STORY: StorySettings = {
   imageParams: {},
   videoModel: "",
   videoParams: {},
+  videoSound: false,
+  refImages: [],
+  useRefs: false,
 };
 
 export const styleRules = (s: StorySettings, id: StyleId = s.style) => (s.rules[id] ?? STORY_STYLES[id].rules).trim();
