@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Fractal UI styles</title>
+<style>
+  :root {
+    --bg: #f6f7fb; --surface: #ffffff; --surface2: #eceff6; --line: #d7dbe6;
+    --text: #151821; --muted: #5d667d; --accent: #2f5bd8; --accent-ink: #fff;
+    --found: #1f8f82; --step: #5d667d; --concl: #b4561d; --hl: #fff1b8;
+    --a: #2f5bd8; --b: #b4561d; --c: #1f8f82;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 32px; background: #dfe3ec; font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--text); }
+  .gallery { display: flex; flex-wrap: wrap; gap: 40px; align-items: flex-start; }
+  .item h2 { font-size: 15px; margin: 0 0 10px; color: #333; }
+  .pair { display: flex; gap: 24px; align-items: center; }
+  .arrow { font-size: 13px; color: #555; text-align: center; }
+  .arrow b { display: block; font-size: 28px; color: var(--accent); }
+
+  .phone { width: 412px; height: 915px; background: var(--bg); border-radius: 28px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 10px 30px rgba(0,0,0,.18); border: 1px solid #c8cdd8; position: relative; }
+  .status { height: 28px; padding: 6px 18px 0; font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; }
+  .top { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-bottom: 1px solid var(--line); background: var(--bg); }
+  .crumb { height: 28px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface2); font-size: 12.5px; display: inline-flex; align-items: center; white-space: nowrap; }
+  .crumb.on { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+  .ib { width: 32px; height: 32px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); display: inline-grid; place-items: center; flex: none; }
+  .ib svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .grow { flex: 1; min-width: 0; }
+  .body { flex: 1; min-height: 0; overflow: hidden; position: relative; }
+  .dock { border-top: 1px solid var(--line); padding: 8px 10px 10px; background: var(--bg); display: flex; flex-direction: column; gap: 6px; }
+  .askrow { display: flex; gap: 6px; align-items: center; }
+  .input { flex: 1; height: 38px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 0 12px; display: flex; align-items: center; color: var(--muted); font-size: 14px; }
+  .btn { height: 36px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); display: inline-flex; align-items: center; gap: 6px; font-size: 14px; white-space: nowrap; }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 600; }
+  .chip { height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface2); font-size: 13px; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+  .chip.on { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+  .tabs { display: flex; border-top: 1px solid var(--line); background: var(--surface); }
+  .tabs span { flex: 1; text-align: center; padding: 10px 0 14px; font-size: 13px; color: var(--muted); }
+  .tabs span.on { color: var(--accent); font-weight: 600; }
+  .muted { color: var(--muted); }
+  .small { font-size: 12.5px; }
+  .kind { font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; font-weight: 700; }
+  .kind.f { color: var(--found); } .kind.s { color: var(--step); } .kind.c { color: var(--concl); }
+
+  /* 2 reader */
+  .reader { padding: 16px 18px; font-size: 16px; line-height: 1.6; }
+  .reader h1 { font-size: 20px; margin: 0 0 4px; }
+  .reader p { margin: 0 0 12px; }
+  mark { background: var(--hl); padding: 1px 0; border-bottom: 2px solid #e2b400; }
+  .thread { margin: -4px 0 14px 10px; border-left: 3px solid var(--accent); padding-left: 12px; }
+  .qline { font-size: 13.5px; font-weight: 600; color: var(--accent); display: flex; gap: 6px; align-items: center; }
+  .reply { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; margin-top: 6px; font-size: 14px; line-height: 1.5; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+  .reply .chips { display: flex; gap: 6px; margin-top: 8px; }
+  .toolbar { position: absolute; left: 70px; top: 214px; background: #151821; color: #fff; border-radius: 10px; display: flex; font-size: 13px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,.25); }
+  .toolbar span { padding: 7px 11px; border-right: 1px solid #333; }
+  .toolbar span:last-child { border: none; }
+  .toolbar span.go { background: var(--accent); }
+
+  /* 3 columns */
+  .cols { display: flex; height: 100%; }
+  .col { flex: 1; border-right: 1px solid var(--line); padding: 8px 6px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .col:last-child { border: none; background: var(--surface); }
+  .col h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 2px 4px 2px; }
+  .cell { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 7px 8px; font-size: 13px; line-height: 1.35; display: flex; gap: 4px; }
+  .cell .t { flex: 1; }
+  .cell .chev { color: var(--muted); }
+  .cell.sel { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+  .cell.sel .chev { color: var(--accent-ink); }
+  .cell.q { background: #e9effd; border-color: #c4d3fa; font-weight: 600; }
+  .detail { font-size: 13.5px; line-height: 1.5; padding: 4px; }
+  .formula { font: 600 18px/1.2 Georgia, serif; text-align: center; padding: 10px; background: var(--surface2); border-radius: 10px; margin: 6px 0; }
+
+  /* 10 split */
+  .doc { padding: 12px 16px; background: var(--surface); height: 100%; }
+  .doc h1 { font-size: 18px; margin: 0 0 8px; display: flex; justify-content: space-between; align-items: center; }
+  .doc ol { margin: 0; padding-left: 22px; font-size: 14.5px; line-height: 1.5; }
+  .doc li { margin: 0 0 8px; padding: 2px 6px; border-radius: 8px; }
+  .doc li.tap { background: #e9effd; outline: 2px solid var(--accent); }
+  .doc li.new { background: #e6f5f2; }
+  .handle { height: 22px; display: grid; place-items: center; background: var(--surface2); border-block: 1px solid var(--line); }
+  .handle i { width: 44px; height: 5px; border-radius: 3px; background: #aab2c4; display: block; }
+  .chat { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; height: 100%; }
+  .ctx { font-size: 12px; color: var(--muted); border: 1px dashed var(--line); border-radius: 10px; padding: 6px 8px; }
+  .msg { max-width: 85%; padding: 8px 11px; border-radius: 14px; font-size: 14px; line-height: 1.45; }
+  .msg.me { align-self: flex-end; background: var(--accent); color: #fff; border-bottom-right-radius: 4px; }
+  .msg.ai { align-self: flex-start; background: var(--surface); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
+  .msg .add { margin-top: 6px; display: inline-flex; }
+
+  /* 11a tiles */
+  .tiles { padding: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .tile { border-radius: 16px; padding: 12px; min-height: 104px; display: flex; flex-direction: column; justify-content: space-between; border: 1px solid var(--line); background: var(--surface); }
+  .tile b { font-size: 15px; line-height: 1.25; }
+  .tile .meta { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); }
+  .tile .count { background: var(--surface2); border-radius: 999px; padding: 2px 8px; font-weight: 600; color: var(--text); }
+  .t1 { background: #e9effd; border-color: #c4d3fa; } .t2 { background: #fdeee4; border-color: #f2cfb6; }
+  .t3 { background: #e3f4f1; border-color: #b9e1da; } .t4 { background: #f3ecfb; border-color: #dccbf2; }
+  .tile.press { outline: 3px solid var(--accent); transform: scale(.98); }
+  .concl { margin: 4px 12px 0; border: 2px solid var(--concl); border-radius: 14px; padding: 10px 12px; background: #fff7f1; }
+  .points { margin: 4px 12px; display: flex; flex-direction: column; gap: 8px; }
+  .point { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--found); border-radius: 10px; padding: 8px 10px; font-size: 14px; }
+  .point.s { border-left-color: var(--step); }
+  .levelbar { margin: 10px 12px 0; font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+  .dots { display: flex; gap: 4px; } .dots i { width: 22px; height: 6px; border-radius: 3px; background: var(--line); display: block; } .dots i.on { background: var(--accent); }
+
+  /* 12 big idea */
+  .big { margin: 14px; border-radius: 18px; padding: 16px; background: linear-gradient(135deg, #2f5bd8, #5b3fd0); color: #fff; }
+  .big .lbl { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; opacity: .85; font-weight: 700; }
+  .big p { margin: 6px 0 0; font-size: 19px; line-height: 1.35; font-weight: 600; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; background: var(--surface); }
+  .seg span { padding: 6px 12px; font-size: 13px; }
+  .seg span.on { background: var(--accent); color: #fff; }
+  .tree { margin: 4px 14px; }
+  .node { display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); margin: 6px 0; font-size: 14px; }
+  .node .tw { width: 18px; color: var(--muted); flex: none; font-size: 12px; padding-top: 2px; }
+  .node .badge { margin-left: auto; font-size: 11px; color: var(--muted); background: var(--surface2); border-radius: 999px; padding: 1px 7px; flex: none; }
+  .kids { margin-left: 22px; border-left: 2px solid var(--line); padding-left: 10px; }
+  .node.sel { border-color: var(--accent); box-shadow: 0 0 0 2px #c4d3fa; }
+  .node.fine { background: var(--bg); font-size: 13px; }
+
+  svg.map text { font-family: system-ui, sans-serif; }
+  .legend { position: absolute; left: 12px; bottom: 12px; font-size: 11.5px; color: var(--muted); background: rgba(255,255,255,.85); border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; }
+  .zoom { position: absolute; right: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 6px; }
+  .note { font-size: 12px; color: var(--muted); padding: 0 2px; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <symbol id="i-search" viewBox="0 0 24 24"><path d="M10.5 4a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13zM15.5 15.5 21 21"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><path d="M5 12h.01M12 12h.01M19 12h.01"/></symbol>
+    <symbol id="i-prev" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></symbol>
+    <symbol id="i-council" viewBox="0 0 24 24"><path d="M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM16 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2 20c0-3 2.7-5 6-5s6 2 6 5M12.5 15.4c1-.3 2.2-.4 3.5-.4 3.3 0 6 2 6 5"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+    <symbol id="i-fit" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+    <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4.5L6 21z"/></symbol>
+    <symbol id="i-doc" viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6zM14 3v5h5M9 12h7M9 16h7"/></symbol>
+    <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></symbol>
+  </defs>
+</svg>
+<div class="gallery">
+
+<!-- 2 Highlight & branch reader -->
+<div class="item" id="m2"><h2>2 · Highlight &amp; branch reader</h2>
+<div class="phone">
+  <div class="status"><span>10:02</span><span>●●● 82%</span></div>
+  <div class="top">
+    <span class="crumb on">Sky blue</span><span class="grow"></span>
+    <span class="ib"><svg><use href="#i-search"/></svg></span><span class="ib"><svg><use href="#i-more"/></svg></span>
+  </div>
+  <div class="body">
+    <div class="reader">
+      <h1>Why is the sky blue?</h1>
+      <p class="muted small">Gemini 3.5 Pro · 6 premises · 2 threads</p>
+      <p>Sunlight is a mix of every color, each a wave of a different length.</p>
+      <p><mark>Air molecules scatter short waves far more than long ones.</mark></p>
+      <div class="thread">
+        <div class="qline">↳ “Why short waves more?”</div>
+        <div class="reply">Scattering strength grows with 1/λ⁴, so halving the wavelength gives about <b>16×</b> more scattering.
+          <div class="chips"><span class="chip">Ask more</span><span class="chip">Collapse</span><span class="chip">Bookmark</span></div>
+        </div>
+      </div>
+      <p>So the scattered light that reaches your eye from every direction is mostly blue.</p>
+      <p><mark style="background:#e6f5f2;border-color:#1f8f82">Violet scatters even more, yet the sky isn’t violet.</mark></p>
+      <div class="thread" style="border-color:var(--found)"><div class="qline" style="color:var(--found)">↳ “Why not violet?” · 1 reply · tap to open</div></div>
+      <p>The sun emits less violet, and our eyes are less sensitive to it.</p>
+    </div>
+    <div class="toolbar" style="top:398px;left:96px"><span>Copy</span><span>Bookmark</span><span class="go">Ask about this</span></div>
+  </div>
+  <div class="dock">
+    <div class="note">Select any text to ask about it. Threads stay beside the line.</div>
+    <div class="askrow"><span class="ib"><svg><use href="#i-council"/></svg></span><div class="input">Ask about the whole answer…</div><span class="btn primary">Ask</span></div>
+  </div>
+  <div class="tabs"><span class="on">Learn</span><span>Library</span><span>Settings</span></div>
+</div></div>
+
+<!-- 3 Column browser -->
+<div class="item" id="m3"><h2>3 · Column browser</h2>
+<div class="phone">
+  <div class="status"><span>10:05</span><span>●●● 81%</span></div>
+  <div class="top">
+    <span class="ib"><svg><use href="#i-prev"/></svg></span>
+    <span class="crumb">Sky blue</span><span class="muted">›</span><span class="crumb">Scattering</span><span class="muted">›</span><span class="crumb on">1/λ⁴</span>
+  </div>
+  <div class="body">
+    <div class="cols">
+      <div class="col">
+        <h3>Question</h3>
+        <div class="cell q"><span class="t">Why is the sky blue?</span></div>
+        <div class="cell"><span class="t"><span class="kind f">Found.</span><br/>Light is waves</span><span class="chev">›</span></div>
+        <div class="cell sel"><span class="t"><span class="kind" style="color:#fff">Found.</span><br/>Small particles scatter</span><span class="chev">›</span></div>
+        <div class="cell"><span class="t"><span class="kind s">Step</span><br/>Air scatters blue most</span><span class="chev">›</span></div>
+        <div class="cell"><span class="t"><span class="kind c">Concl.</span><br/>Blue sky</span><span class="chev">›</span></div>
+        <div class="cell"><span class="t muted">+ Why not violet? (3)</span></div>
+      </div>
+      <div class="col">
+        <h3>Scattering</h3>
+        <div class="cell sel"><span class="t">Short waves scatter 16× more</span><span class="chev">›</span></div>
+        <div class="cell"><span class="t">Molecules are far smaller than λ</span><span class="chev">›</span></div>
+        <div class="cell"><span class="t">Dust scatters all colors</span><span class="chev">›</span></div>
+        <div class="cell"><span class="t muted">Ask here…</span></div>
+      </div>
+      <div class="col">
+        <h3>1/λ⁴</h3>
+        <div class="formula">I ∝ 1 / λ⁴</div>
+        <div class="detail">Rayleigh: tiny oscillating charges radiate more strongly at higher frequency.</div>
+        <div class="detail muted small">Blue 450 nm vs red 700 nm → ~5.9× more.</div>
+        <div class="cell"><span class="t">Why the 4th power?</span><span class="chev">›</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="dock">
+    <div class="note">Tap a point to open the next column. ◀ goes back one level.</div>
+    <div class="askrow"><div class="input">Ask about “1/λ⁴”…</div><span class="btn primary">Ask</span></div>
+  </div>
+  <div class="tabs"><span class="on">Learn</span><span>Library</span><span>Settings</span></div>
+</div></div>
+
+<!-- 7 Radial mind map -->
+<div class="item" id="m7"><h2>7 · Radial mind map</h2>
+<div class="phone">
+  <div class="status"><span>10:09</span><span>●●● 80%</span></div>
+  <div class="top"><span class="crumb on">Sky blue</span><span class="grow"></span><span class="ib"><svg><use href="#i-search"/></svg></span><span class="ib"><svg><use href="#i-more"/></svg></span></div>
+  <div class="body">
+    <svg class="map" viewBox="0 0 412 640" width="412" height="640">
+      <g fill="none" stroke-width="2.5" stroke-linecap="round">
+        <path d="M206 320 C 206 250, 120 220, 96 160" stroke="#1f8f82"/>
+        <path d="M206 320 C 260 260, 300 230, 318 160" stroke="#2f5bd8"/>
+        <path d="M206 320 C 290 320, 330 340, 350 380" stroke="#b4561d"/>
+        <path d="M206 320 C 180 400, 120 420, 86 470" stroke="#7a4fc9"/>
+        <path d="M206 320 C 220 420, 250 470, 270 520" stroke="#5d667d"/>
+        <path d="M318 160 C 330 120, 350 95, 360 70" stroke="#2f5bd8" stroke-width="2"/>
+        <path d="M318 160 C 280 120, 250 90, 236 66" stroke="#2f5bd8" stroke-width="2"/>
+        <path d="M86 470 C 60 520, 50 550, 52 580" stroke="#7a4fc9" stroke-width="2" stroke-dasharray="5 5"/>
+      </g>
+      <circle cx="206" cy="320" r="62" fill="#2f5bd8"/>
+      <text x="206" y="312" text-anchor="middle" fill="#fff" font-size="15" font-weight="700">Why is the</text>
+      <text x="206" y="332" text-anchor="middle" fill="#fff" font-size="15" font-weight="700">sky blue?</text>
+      <g font-size="13">
+        <rect x="40" y="134" width="112" height="44" rx="22" fill="#e3f4f1" stroke="#1f8f82"/><text x="96" y="161" text-anchor="middle">Light is waves</text>
+        <rect x="262" y="134" width="112" height="44" rx="22" fill="#2f5bd8"/><text x="318" y="161" text-anchor="middle" fill="#fff" font-weight="600">Scattering</text>
+        <rect x="296" y="380" width="104" height="44" rx="22" fill="#fdeee4" stroke="#b4561d"/><text x="348" y="407" text-anchor="middle">Eye cones</text>
+        <rect x="24" y="470" width="124" height="44" rx="22" fill="#f3ecfb" stroke="#7a4fc9"/><text x="86" y="497" text-anchor="middle">Red sunsets</text>
+        <rect x="214" y="520" width="112" height="44" rx="22" fill="#eceff6" stroke="#5d667d"/><text x="270" y="547" text-anchor="middle">Sun spectrum</text>
+        <rect x="316" y="46" width="88" height="34" rx="17" fill="#e9effd" stroke="#2f5bd8"/><text x="360" y="68" text-anchor="middle" font-size="12">1/λ⁴ law</text>
+        <rect x="182" y="40" width="104" height="34" rx="17" fill="#e9effd" stroke="#2f5bd8"/><text x="234" y="62" text-anchor="middle" font-size="12">Tiny molecules</text>
+        <rect x="8" y="580" width="96" height="34" rx="17" fill="#fff" stroke="#7a4fc9" stroke-dasharray="4 4"/><text x="56" y="602" text-anchor="middle" font-size="12" fill="#7a4fc9">＋ grow</text>
+      </g>
+    </svg>
+    <div class="legend">Center = your question · rings = depth<br/>Tap a branch to grow it · dashed = suggested</div>
+    <div class="zoom"><span class="ib"><svg><use href="#i-plus"/></svg></span><span class="ib"><svg><use href="#i-minus"/></svg></span><span class="ib"><svg><use href="#i-fit"/></svg></span></div>
+  </div>
+  <div class="dock">
+    <div class="askrow"><span class="chip on">Scattering</span><span class="note grow">selected · 2 sub-branches</span></div>
+    <div class="askrow"><span class="ib"><svg><use href="#i-council"/></svg></span><div class="input">Ask about “Scattering”…</div><span class="btn primary">Ask</span></div>
+  </div>
+  <div class="tabs"><span class="on">Learn</span><span>Library</span><span>Settings</span></div>
+</div></div>
+
+<!-- 10 Split view -->
+<div class="item" id="m10"><h2>10 · Split view: study document + chat</h2>
+<div class="phone">
+  <div class="status"><span>10:14</span><span>●●● 79%</span></div>
+  <div class="top"><span class="ib"><svg><use href="#i-doc"/></svg></span><b class="grow">Study doc: Sky color</b><span class="chip">Export</span></div>
+  <div class="body" style="display:flex;flex-direction:column">
+    <div style="flex:0 0 400px;overflow:hidden">
+      <div class="doc">
+        <h1>Why the sky is blue <span class="muted small">auto-updated</span></h1>
+        <ol>
+          <li>Sunlight is a mix of all colors, each a different wavelength.</li>
+          <li class="tap">Air molecules scatter short (blue) waves ~16× more than long ones.</li>
+          <li>Violet scatters even more, but the sun emits less of it.</li>
+          <li>Our eye cones are less sensitive to violet, so the mix looks blue.</li>
+          <li class="new">Scattering ∝ 1/λ⁴ because tiny charges radiate harder at high frequency. <span class="small" style="color:var(--found)">← added from chat</span></li>
+        </ol>
+      </div>
+    </div>
+    <div class="handle"><i></i></div>
+    <div style="flex:1;min-height:0;overflow:hidden">
+      <div class="chat">
+        <div class="ctx">Chatting about ¶2 · “Air molecules scatter short waves…”</div>
+        <div class="msg me">Why the 4th power?</div>
+        <div class="msg ai">Tiny charges in each molecule shake with the light; the power they re-radiate grows with frequency⁴.<br/><span class="chip add">↑ Add to doc</span></div>
+        <div class="msg me">And bigger particles?</div>
+        <div class="msg ai">They scatter all colors about equally, which is why clouds look white.<br/><span class="chip add">↑ Add to doc</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="dock">
+    <div class="askrow"><span class="ib"><svg><use href="#i-council"/></svg></span><div class="input">Ask about ¶2…</div><span class="btn primary">Ask</span></div>
+  </div>
+  <div class="tabs"><span class="on">Learn</span><span>Library</span><span>Settings</span></div>
+</div></div>
+
+<!-- 11a Category drill-down -->
+<div class="item" id="m11a"><h2>11a · Categories inside categories: tap to go one layer deeper</h2>
+<div class="pair">
+<div class="phone">
+  <div class="status"><span>10:20</span><span>●●● 78%</span></div>
+  <div class="top"><span class="crumb on">Sky blue</span><span class="grow"></span><span class="ib"><svg><use href="#i-search"/></svg></span><span class="ib"><svg><use href="#i-more"/></svg></span></div>
+  <div class="body">
+    <div class="levelbar">Level 1 of 3 <span class="dots"><i class="on"></i><i></i><i></i></span></div>
+    <div class="tiles">
+      <div class="tile t1 press"><b>Physics of light</b><div class="meta"><span>2 sub-categories</span><span class="count">7 ›</span></div></div>
+      <div class="tile t2"><b>Human vision</b><div class="meta"><span>cones, brain</span><span class="count">3 ›</span></div></div>
+      <div class="tile t3"><b>Atmosphere</b><div class="meta"><span>gases, dust</span><span class="count">4 ›</span></div></div>
+      <div class="tile t4"><b>The sun</b><div class="meta"><span>spectrum</span><span class="count">2 ›</span></div></div>
+    </div>
+    <div class="concl"><span class="kind c">Conclusion</span><div style="font-weight:600">The sky looks blue: air scatters blue most, and our eyes favor it over violet.</div></div>
+    <div class="levelbar">Questions you asked here</div>
+    <div class="points"><div class="point s">Why not violet? · 3 points</div><div class="point s">Why red sunsets? · 4 points</div></div>
+  </div>
+  <div class="dock"><div class="askrow"><div class="input">Ask about the whole topic…</div><span class="btn primary">Ask</span></div></div>
+  <div class="tabs"><span class="on">Learn</span><span>Library</span><span>Settings</span></div>
+</div>
+<div class="arrow"><b>→</b>tap<br/>“Physics<br/>of light”</div>
+<div class="phone">
+  <div class="status"><span>10:20</span><span>●●● 78%</span></div>
+  <div class="top"><span class="ib"><svg><use href="#i-prev"/></svg></span><span class="crumb">Sky blue</span><span class="muted">›</span><span class="crumb on">Physics of light</span></div>
+  <div class="body">
+    <div class="levelbar">Level 2 of 3 <span class="dots"><i class="on"></i><i class="on"></i><i></i></span></div>
+    <div class="tiles">
+      <div class="tile t1"><b>Waves &amp; color</b><div class="meta"><span>wavelength</span><span class="count">2 ›</span></div></div>
+      <div class="tile t1" style="background:#dce6fd"><b>Scattering</b><div class="meta"><span>⊃ Rayleigh</span><span class="count">3 ›</span></div></div>
+    </div>
+    <div class="levelbar">Points in this category</div>
+    <div class="points">
+      <div class="point"><span class="kind f">Foundation</span><br/>Light carries energy as waves.</div>
+      <div class="point"><span class="kind f">Foundation</span><br/>Color is set by wavelength: blue ≈ 450 nm, red ≈ 700 nm.</div>
+      <div class="point s"><span class="kind s">Step</span><br/>Short waves interact more strongly with tiny particles.</div>
+    </div>
+    <div style="padding:10px 12px;display:flex;gap:6px;flex-wrap:wrap"><span class="chip">Ask about this category</span><span class="chip">Select points</span><span class="chip"><svg width="14" height="14" style="stroke:currentColor;fill:none;stroke-width:1.8"><use href="#i-bookmark"/></svg>Save</span></div>
+  </div>
+  <div class="dock"><div class="askrow"><div class="input">Ask about “Physics of light”…</div><span class="btn primary">Ask</span></div></div>
+  <div class="tabs"><span class="on">Learn</span><span>Library</span><span>Settings</span></div>
+</div>
+</div></div>
+
+<!-- 11b Nested mind map -->
+<div class="item" id="m11b"><h2>11b · Categories inside categories: nested map</h2>
+<div class="phone">
+  <div class="status"><span>10:24</span><span>●●● 77%</span></div>
+  <div class="top"><span class="crumb on">Sky blue</span><span class="grow"></span><span class="chip">Foundations</span><span class="ib"><svg><use href="#i-more"/></svg></span></div>
+  <div class="body">
+    <svg class="map" viewBox="0 0 412 640" width="412" height="640">
+      <rect x="12" y="14" width="388" height="330" rx="28" fill="#e9effd" stroke="#2f5bd8" stroke-width="2"/>
+      <text x="32" y="42" font-size="14" font-weight="700" fill="#2f5bd8">Physics of light</text>
+      <rect x="28" y="56" width="142" height="132" rx="20" fill="#fff" stroke="#9db4f2"/>
+      <text x="44" y="80" font-size="13" font-weight="700" fill="#2f5bd8">Waves &amp; color</text>
+      <g font-size="12.5"><circle cx="48" cy="104" r="4" fill="#1f8f82"/><text x="58" y="108">Light is waves</text>
+      <circle cx="48" cy="130" r="4" fill="#1f8f82"/><text x="58" y="134">Color = λ</text>
+      <circle cx="48" cy="156" r="4" fill="#1f8f82"/><text x="58" y="160">Blue 450 nm</text></g>
+      <rect x="182" y="56" width="204" height="272" rx="24" fill="#fff" stroke="#9db4f2"/>
+      <text x="198" y="80" font-size="13" font-weight="700" fill="#2f5bd8">Scattering</text>
+      <g font-size="12.5"><circle cx="202" cy="104" r="4" fill="#1f8f82"/><text x="212" y="108">Short waves scatter more</text>
+      <circle cx="202" cy="130" r="4" fill="#1f8f82"/><text x="212" y="134">Dust scatters all colors</text></g>
+      <rect x="196" y="150" width="176" height="160" rx="20" fill="#dce6fd" stroke="#2f5bd8" stroke-width="2"/>
+      <text x="212" y="174" font-size="13" font-weight="700" fill="#2f5bd8">Rayleigh</text>
+      <g font-size="12.5"><circle cx="216" cy="198" r="4" fill="#1f8f82"/><text x="226" y="202">I ∝ 1/λ⁴</text>
+      <circle cx="216" cy="224" r="4" fill="#1f8f82"/><text x="226" y="228">Molecules ≪ λ</text>
+      <circle cx="216" cy="250" r="4" fill="#5d667d"/><text x="226" y="254">Blue 5.9× red</text></g>
+      <rect x="212" y="268" width="144" height="28" rx="14" fill="#2f5bd8"/><text x="284" y="287" text-anchor="middle" font-size="12" fill="#fff">pinch to open ⤢</text>
+      <rect x="28" y="200" width="142" height="128" rx="20" fill="#fff" stroke="#9db4f2" stroke-dasharray="5 4"/>
+      <text x="44" y="224" font-size="12.5" fill="#5d667d">+ room for new</text><text x="44" y="242" font-size="12.5" fill="#5d667d">sub-categories</text>
+      <rect x="12" y="360" width="186" height="150" rx="26" fill="#fdeee4" stroke="#b4561d" stroke-width="2"/>
+      <text x="30" y="388" font-size="14" font-weight="700" fill="#b4561d">Human vision</text>
+      <g font-size="12.5"><circle cx="32" cy="414" r="4" fill="#1f8f82"/><text x="42" y="418">3 kinds of cones</text>
+      <circle cx="32" cy="440" r="4" fill="#1f8f82"/><text x="42" y="444">Weak violet response</text>
+      <circle cx="32" cy="466" r="4" fill="#5d667d"/><text x="42" y="470">Brain mixes signals</text></g>
+      <rect x="212" y="360" width="188" height="150" rx="26" fill="#e3f4f1" stroke="#1f8f82" stroke-width="2"/>
+      <text x="230" y="388" font-size="14" font-weight="700" fill="#1f8f82">Atmosphere</text>
+      <g font-size="12.5"><circle cx="232" cy="414" r="4" fill="#1f8f82"/><text x="242" y="418">Mostly N₂ and O₂</text>
+      <circle cx="232" cy="440" r="4" fill="#1f8f82"/><text x="242" y="444">~100 km thick</text>
+      <circle cx="232" cy="466" r="4" fill="#5d667d"/><text x="242" y="470">Longer path at sunset</text></g>
+      <path d="M206 520 L206 548" stroke="#b4561d" stroke-width="2"/>
+      <rect x="40" y="548" width="332" height="58" rx="18" fill="#fff7f1" stroke="#b4561d" stroke-width="2"/>
+      <text x="56" y="572" font-size="11" font-weight="700" fill="#b4561d" letter-spacing="1">CONCLUSION</text>
+      <text x="56" y="592" font-size="13.5" font-weight="600">Sky looks blue: air + eyes favor blue</text>
+    </svg>
+    <div class="zoom"><span class="ib"><svg><use href="#i-plus"/></svg></span><span class="ib"><svg><use href="#i-minus"/></svg></span><span class="ib"><svg><use href="#i-fit"/></svg></span></div>
+  </div>
+  <div class="dock"><div class="askrow"><div class="input">Ask about “Rayleigh”…</div><span class="btn primary">Ask</span></div></div>
+  <div class="tabs"><span class="on">Learn</span><span>Library</span><span>Settings</span></div>
+</div></div>
+
+<!-- 12 Big idea to details -->
+<div class="item" id="m12"><h2>12 · Big idea → details</h2>
+<div class="phone">
+  <div class="status"><span>10:30</span><span>●●● 76%</span></div>
+  <div class="top"><span class="crumb on">Sky blue</span><span class="grow"></span><span class="ib"><svg><use href="#i-search"/></svg></span><span class="ib"><svg><use href="#i-more"/></svg></span></div>
+  <div class="body">
+    <div class="big"><div class="lbl">Big idea</div><p>The sky is blue because air scatters blue light the most, and our eyes favor blue over violet.</p></div>
+    <div style="padding:0 14px;display:flex;align-items:center;gap:8px"><span class="small muted">Detail</span><span class="seg"><span>Big</span><span class="on">Mid</span><span>Fine</span></span><span class="grow"></span><span class="small muted">3 reasons</span></div>
+    <div class="tree">
+      <div class="node sel"><span class="tw">▾</span><span>Short waves scatter far more</span><span class="badge">2</span></div>
+      <div class="kids">
+        <div class="node fine"><span class="tw">▸</span><span>Strength grows with 1/λ⁴ (Rayleigh)</span><span class="badge">why?</span></div>
+        <div class="node fine"><span class="tw">▸</span><span>Air molecules are much smaller than light waves</span><span class="badge">why?</span></div>
+      </div>
+      <div class="node"><span class="tw">▸</span><span>The sun emits less violet</span><span class="badge">1</span></div>
+      <div class="node"><span class="tw">▸</span><span>Eyes are less sensitive to violet</span><span class="badge">2</span></div>
+      <div class="node" style="border-style:dashed"><span class="tw" style="color:var(--concl)">◆</span><span>Follow-up: why are sunsets red?</span><span class="badge">4</span></div>
+    </div>
+    <div style="padding:6px 14px" class="small muted">Read top-down: the answer first, then tap a reason to see what it rests on, down to first principles.</div>
+  </div>
+  <div class="dock"><div class="askrow"><span class="ib"><svg><use href="#i-council"/></svg></span><div class="input">Ask about “Short waves scatter…”</div><span class="btn primary">Ask</span></div></div>
+  <div class="tabs"><span class="on">Learn</span><span>Library</span><span>Settings</span></div>
+</div></div>
+
+</div>
+</body>
+</html>
