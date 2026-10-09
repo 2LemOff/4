@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>Scale of knowledge</title>
+<style>
+  :root {
+    --bg: #f6f7fb; --surface: #ffffff; --surface2: #eceff6; --line: #d7dbe6;
+    --text: #151821; --muted: #5d667d; --accent: #2f5bd8; --accent-ink: #fff;
+    --found: #1f8f82; --step: #5d667d; --concl: #b4561d; --hl: #fff1b8;
+    --a: #2f5bd8; --b: #b4561d; --c: #1f8f82;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 32px; background: #dfe3ec; font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--text); }
+  .gallery { display: flex; flex-wrap: wrap; gap: 40px; align-items: flex-start; }
+  .item h2 { font-size: 15px; margin: 0 0 10px; color: #333; }
+  .pair { display: flex; gap: 24px; align-items: center; }
+  .arrow { font-size: 13px; color: #555; text-align: center; }
+  .arrow b { display: block; font-size: 28px; color: var(--accent); }
+
+  .phone { width: 412px; height: 915px; background: var(--bg); border-radius: 28px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 10px 30px rgba(0,0,0,.18); border: 1px solid #c8cdd8; position: relative; }
+  .status { height: 28px; padding: 6px 18px 0; font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; }
+  .top { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-bottom: 1px solid var(--line); background: var(--bg); }
+  .crumb { height: 28px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface2); font-size: 12.5px; display: inline-flex; align-items: center; white-space: nowrap; }
+  .crumb.on { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+  .ib { width: 32px; height: 32px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); display: inline-grid; place-items: center; flex: none; }
+  .ib svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .grow { flex: 1; min-width: 0; }
+  .body { flex: 1; min-height: 0; overflow: hidden; position: relative; }
+  .dock { border-top: 1px solid var(--line); padding: 8px 10px 10px; background: var(--bg); display: flex; flex-direction: column; gap: 6px; }
+  .askrow { display: flex; gap: 6px; align-items: center; }
+  .input { flex: 1; height: 38px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 0 12px; display: flex; align-items: center; color: var(--muted); font-size: 14px; }
+  .btn { height: 36px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); display: inline-flex; align-items: center; gap: 6px; font-size: 14px; white-space: nowrap; }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 600; }
+  .chip { height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface2); font-size: 13px; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+  .chip.on { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+  .tabs { display: flex; border-top: 1px solid var(--line); background: var(--surface); }
+  .tabs span { flex: 1; text-align: center; padding: 10px 0 14px; font-size: 13px; color: var(--muted); }
+  .tabs span.on { color: var(--accent); font-weight: 600; }
+  .muted { color: var(--muted); }
+  .small { font-size: 12.5px; }
+  .kind { font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; font-weight: 700; }
+  .kind.f { color: var(--found); } .kind.s { color: var(--step); } .kind.c { color: var(--concl); }
+
+  /* 2 reader */
+  .reader { padding: 16px 18px; font-size: 16px; line-height: 1.6; }
+  .reader h1 { font-size: 20px; margin: 0 0 4px; }
+  .reader p { margin: 0 0 12px; }
+  mark { background: var(--hl); padding: 1px 0; border-bottom: 2px solid #e2b400; }
+  .thread { margin: -4px 0 14px 10px; border-left: 3px solid var(--accent); padding-left: 12px; }
+  .qline { font-size: 13.5px; font-weight: 600; color: var(--accent); display: flex; gap: 6px; align-items: center; }
+  .reply { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; margin-top: 6px; font-size: 14px; line-height: 1.5; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+  .reply .chips { display: flex; gap: 6px; margin-top: 8px; }
+  .toolbar { position: absolute; left: 70px; top: 214px; background: #151821; color: #fff; border-radius: 10px; display: flex; font-size: 13px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,.25); }
+  .toolbar span { padding: 7px 11px; border-right: 1px solid #333; }
+  .toolbar span:last-child { border: none; }
+  .toolbar span.go { background: var(--accent); }
+
+  /* 3 columns */
+  .cols { display: flex; height: 100%; }
+  .col { flex: 1; border-right: 1px solid var(--line); padding: 8px 6px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .col:last-child { border: none; background: var(--surface); }
+  .col h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 2px 4px 2px; }
+  .cell { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 7px 8px; font-size: 13px; line-height: 1.35; display: flex; gap: 4px; }
+  .cell .t { flex: 1; }
+  .cell .chev { color: var(--muted); }
+  .cell.sel { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+  .cell.sel .chev { color: var(--accent-ink); }
+  .cell.q { background: #e9effd; border-color: #c4d3fa; font-weight: 600; }
+  .detail { font-size: 13.5px; line-height: 1.5; padding: 4px; }
+  .formula { font: 600 18px/1.2 Georgia, serif; text-align: center; padding: 10px; background: var(--surface2); border-radius: 10px; margin: 6px 0; }
+
+  /* 10 split */
+  .doc { padding: 12px 16px; background: var(--surface); height: 100%; }
+  .doc h1 { font-size: 18px; margin: 0 0 8px; display: flex; justify-content: space-between; align-items: center; }
+  .doc ol { margin: 0; padding-left: 22px; font-size: 14.5px; line-height: 1.5; }
+  .doc li { margin: 0 0 8px; padding: 2px 6px; border-radius: 8px; }
+  .doc li.tap { background: #e9effd; outline: 2px solid var(--accent); }
+  .doc li.new { background: #e6f5f2; }
+  .handle { height: 22px; display: grid; place-items: center; background: var(--surface2); border-block: 1px solid var(--line); }
+  .handle i { width: 44px; height: 5px; border-radius: 3px; background: #aab2c4; display: block; }
+  .chat { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; height: 100%; }
+  .ctx { font-size: 12px; color: var(--muted); border: 1px dashed var(--line); border-radius: 10px; padding: 6px 8px; }
+  .msg { max-width: 85%; padding: 8px 11px; border-radius: 14px; font-size: 14px; line-height: 1.45; }
+  .msg.me { align-self: flex-end; background: var(--accent); color: #fff; border-bottom-right-radius: 4px; }
+  .msg.ai { align-self: flex-start; background: var(--surface); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
+  .msg .add { margin-top: 6px; display: inline-flex; }
+
+  /* 11a tiles */
+  .tiles { padding: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .tile { border-radius: 16px; padding: 12px; min-height: 104px; display: flex; flex-direction: column; justify-content: space-between; border: 1px solid var(--line); background: var(--surface); }
+  .tile b { font-size: 15px; line-height: 1.25; }
+  .tile .meta { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); }
+  .tile .count { background: var(--surface2); border-radius: 999px; padding: 2px 8px; font-weight: 600; color: var(--text); }
+  .t1 { background: #e9effd; border-color: #c4d3fa; } .t2 { background: #fdeee4; border-color: #f2cfb6; }
+  .t3 { background: #e3f4f1; border-color: #b9e1da; } .t4 { background: #f3ecfb; border-color: #dccbf2; }
+  .tile.press { outline: 3px solid var(--accent); transform: scale(.98); }
+  .concl { margin: 4px 12px 0; border: 2px solid var(--concl); border-radius: 14px; padding: 10px 12px; background: #fff7f1; }
+  .points { margin: 4px 12px; display: flex; flex-direction: column; gap: 8px; }
+  .point { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--found); border-radius: 10px; padding: 8px 10px; font-size: 14px; }
+  .point.s { border-left-color: var(--step); }
+  .levelbar { margin: 10px 12px 0; font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+  .dots { display: flex; gap: 4px; } .dots i { width: 22px; height: 6px; border-radius: 3px; background: var(--line); display: block; } .dots i.on { background: var(--accent); }
+
+  /* 12 big idea */
+  .big { margin: 14px; border-radius: 18px; padding: 16px; background: linear-gradient(135deg, #2f5bd8, #5b3fd0); color: #fff; }
+  .big .lbl { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; opacity: .85; font-weight: 700; }
+  .big p { margin: 6px 0 0; font-size: 19px; line-height: 1.35; font-weight: 600; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; background: var(--surface); }
+  .seg span { padding: 6px 12px; font-size: 13px; }
+  .seg span.on { background: var(--accent); color: #fff; }
+  .tree { margin: 4px 14px; }
+  .node { display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); margin: 6px 0; font-size: 14px; }
+  .node .tw { width: 18px; color: var(--muted); flex: none; font-size: 12px; padding-top: 2px; }
+  .node .badge { margin-left: auto; font-size: 11px; color: var(--muted); background: var(--surface2); border-radius: 999px; padding: 1px 7px; flex: none; }
+  .kids { margin-left: 22px; border-left: 2px solid var(--line); padding-left: 10px; }
+  .node.sel { border-color: var(--accent); box-shadow: 0 0 0 2px #c4d3fa; }
+  .node.fine { background: var(--bg); font-size: 13px; }
+
+  svg.map text { font-family: system-ui, sans-serif; }
+  .legend { position: absolute; left: 12px; bottom: 12px; font-size: 11.5px; color: var(--muted); background: rgba(255,255,255,.85); border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; }
+  .zoom { position: absolute; right: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 6px; }
+  .note { font-size: 12px; color: var(--muted); padding: 0 2px; }
+</style>
+</head><body>
+
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <symbol id="i-search" viewBox="0 0 24 24"><path d="M10.5 4a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13zM15.5 15.5 21 21"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><path d="M5 12h.01M12 12h.01M19 12h.01"/></symbol>
+    <symbol id="i-prev" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></symbol>
+    <symbol id="i-council" viewBox="0 0 24 24"><path d="M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM16 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2 20c0-3 2.7-5 6-5s6 2 6 5M12.5 15.4c1-.3 2.2-.4 3.5-.4 3.3 0 6 2 6 5"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+    <symbol id="i-fit" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+    <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4.5L6 21z"/></symbol>
+    <symbol id="i-doc" viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6zM14 3v5h5M9 12h7M9 16h7"/></symbol>
+    <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></symbol>
+  </defs>
+</svg>
+<style>
+  .scale-top { position: absolute; left: 0; right: 0; top: 0; padding: 10px; display: flex; gap: 8px; z-index: 2; }
+  .search { flex: 1; height: 40px; border-radius: 12px; background: rgba(21,24,33,.82); color: #fff; display: flex; align-items: center; padding: 0 14px; font-weight: 600; font-size: 14.5px; }
+  .dark { background: rgba(21,24,33,.82); color: #fff; border: none; }
+  .levelpill { display: flex; align-items: center; gap: 8px; justify-content: center; }
+  .lvl { background: #5b3fd0; color: #fff; border-radius: 999px; padding: 6px 16px; text-align: center; font-weight: 700; font-size: 14px; line-height: 1.15; box-shadow: 0 0 0 3px #d9d0f7; }
+  .lvl small { display: block; font-weight: 500; font-size: 11px; opacity: .85; }
+  .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .drawer { position: absolute; left: 0; right: 0; bottom: 0; background: var(--surface); border-radius: 22px 22px 0 0; box-shadow: 0 -6px 24px rgba(0,0,0,.18); padding: 8px 14px 12px; display: flex; flex-direction: column; gap: 8px; }
+  .drawer .grab { width: 44px; height: 5px; border-radius: 3px; background: #aab2c4; margin: 2px auto 2px; }
+  .band { border-bottom: 1px solid var(--line); display: flex; align-items: stretch; }
+  .band .ln { width: 62px; flex: none; padding: 8px 6px; font-size: 11px; color: var(--muted); border-right: 1px solid var(--line); line-height: 1.25; }
+  .band .ln b { display: block; font-size: 15px; color: var(--text); }
+  .band .row { flex: 1; display: flex; gap: 8px; padding: 8px; overflow: hidden; align-items: center; }
+  .band.thin { background: #eef0f6; } .band.thin .row { opacity: .75; }
+  .band.cur { background: #f1edfc; box-shadow: inset 4px 0 0 #5b3fd0; }
+  .pebble { flex: none; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); padding: 6px 10px; font-size: 13px; white-space: nowrap; }
+  .pebble.hero { padding: 12px 14px; font-size: 15px; font-weight: 700; border: 2px solid #5b3fd0; background: #fff; box-shadow: 0 4px 12px rgba(91,63,208,.2); }
+  .pebble.ghost { border-style: dashed; color: var(--muted); background: transparent; }
+  .ladder { width: 78px; flex: none; border-right: 1px solid var(--line); padding: 10px 6px; display: flex; flex-direction: column; align-items: center; gap: 4px; background: #eef0f6; }
+  .rung { width: 100%; text-align: center; font-size: 10.5px; color: var(--muted); padding: 6px 2px; border-radius: 10px; line-height: 1.2; }
+  .rung b { display: block; font-size: 15px; color: var(--text); }
+  .rung.on { background: #5b3fd0; color: #fff; } .rung.on b { color: #fff; }
+  .shaft { width: 2px; height: 10px; background: #c4c9d6; }
+  .lrow { display: flex; align-items: center; gap: 8px; padding: 9px 10px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); margin-bottom: 6px; font-size: 14px; }
+  .lrow.on { border: 2px solid #5b3fd0; background: #f6f3ff; font-weight: 600; }
+  .lrow.ghost { border-style: dashed; color: var(--muted); background: transparent; }
+  .lrow .n { margin-left: auto; font-size: 11px; color: var(--muted); }
+</style>
+<div class="gallery">
+
+<!-- A1 -->
+<div class="item" id="a"><h2>A · Scale of knowledge: after the answer, then tap Falsification</h2>
+<div class="pair">
+<div class="phone">
+  <div class="status"><span>12:30</span><span>●●● 82%</span></div>
+  <div class="body" style="background:#e9e9ec">
+    <svg viewBox="0 0 412 700" width="412" height="700" style="position:absolute;inset:0">
+      <!-- level above: huge faded shape, like the basketball -->
+      <circle cx="-40" cy="560" r="300" fill="#c9bff0" opacity=".45"/>
+      <text x="10" y="610" font-size="46" font-weight="800" fill="#9c8ee0" opacity=".55" transform="rotate(-12 10 610)">EPISTEMOLOGY</text>
+      <circle cx="470" cy="60" r="150" fill="#bfe3dc" opacity=".45"/>
+      <text x="300" y="150" font-size="22" font-weight="800" fill="#7fbfb3" opacity=".7">LOGIC</text>
+      <!-- siblings: same level, ghosted -->
+      <g font-size="12.5" text-anchor="middle" fill="#5d667d">
+        <g opacity=".55"><circle cx="78" cy="170" r="34" fill="#fff" stroke="#8b93a7" stroke-dasharray="5 4"/><text x="78" y="166">Occam’s</text><text x="78" y="181">razor</text></g>
+        <g opacity=".55"><circle cx="334" cy="250" r="34" fill="#fff" stroke="#8b93a7" stroke-dasharray="5 4"/><text x="334" y="254">Inversion</text></g>
+        <g opacity=".55"><circle cx="70" cy="330" r="34" fill="#fff" stroke="#8b93a7" stroke-dasharray="5 4"/><text x="70" y="326">First</text><text x="70" y="341">principles</text></g>
+        <g opacity=".55"><circle cx="340" cy="490" r="34" fill="#fff" stroke="#8b93a7" stroke-dasharray="5 4"/><text x="340" y="486">Bayesian</text><text x="340" y="501">updating</text></g>
+        <g opacity=".5"><circle cx="78" cy="470" r="30" fill="#fff" stroke="#8b93a7" stroke-dasharray="5 4"/><text x="78" y="474" font-size="11.5">Steelman</text></g>
+      </g>
+      <!-- current: Falsification -->
+      <circle cx="206" cy="300" r="86" fill="#fff" stroke="#5b3fd0" stroke-width="3"/>
+      <circle cx="206" cy="300" r="94" fill="none" stroke="#5b3fd0" stroke-opacity=".25" stroke-width="6"/>
+      <path d="M172 268 l20 -24 l20 24 M182 256 h20" stroke="#5b3fd0" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <path d="M232 250 l14 14 M246 250 l-14 14" stroke="#b4561d" stroke-width="3" stroke-linecap="round"/>
+      <text x="206" y="300" text-anchor="middle" font-size="19" font-weight="800" fill="#151821">Falsification</text>
+      <!-- level below: tiny dots inside -->
+      <g fill="#5b3fd0" opacity=".7"><circle cx="176" cy="326" r="4"/><circle cx="194" cy="336" r="3"/><circle cx="214" cy="330" r="4"/><circle cx="232" cy="340" r="3"/><circle cx="204" cy="350" r="3"/></g>
+      <text x="206" y="372" text-anchor="middle" font-size="10.5" fill="#5b3fd0">5 parts inside</text>
+      <text x="206" y="414" text-anchor="middle" font-size="13" fill="#151821">A theory is scientific only if</text>
+      <text x="206" y="431" text-anchor="middle" font-size="13" fill="#151821">some observation could prove it wrong.</text>
+    </svg>
+    <div class="scale-top"><span class="ib dark" style="width:40px;height:40px"><svg><use href="#i-more"/></svg></span><div class="search">Search knowledge…</div></div>
+    <div style="position:absolute;left:10px;right:10px;bottom:12px;display:flex;flex-direction:column;gap:10px">
+      <div class="levelpill"><span class="ib">↑</span><div class="lvl">Level 4 of 6<small>Mental tools</small></div><span class="ib">↓</span></div>
+      <div class="actions" style="justify-content:center"><span class="chip">＋ What other tools are on this level?</span><span class="chip on">Question Falsification ↓</span></div>
+    </div>
+  </div>
+  <div class="dock"><div class="askrow"><span class="ib"><svg><use href="#i-council"/></svg></span><div class="input">Ask about Falsification…</div><span class="btn primary">Ask</span></div></div>
+</div>
+
+<div class="arrow"><b>→</b>tap<br/>Falsification<br/>(zooms in)</div>
+
+<!-- A2 -->
+<div class="phone">
+  <div class="status"><span>12:31</span><span>●●● 82%</span></div>
+  <div class="body" style="background:#e9e9ec">
+    <svg viewBox="0 0 412 700" width="412" height="700" style="position:absolute;inset:0">
+      <circle cx="206" cy="250" r="330" fill="#d9d0f7" opacity=".5"/>
+      <text x="206" y="120" text-anchor="middle" font-size="44" font-weight="800" fill="#a99be6" opacity=".6">FALSIFICATION</text>
+      <g font-size="13" text-anchor="middle">
+        <rect x="24" y="150" width="160" height="70" rx="16" fill="#fff" stroke="#1f8f82" stroke-width="2"/><text x="104" y="180" font-weight="700">Testable</text><text x="104" y="198">prediction</text>
+        <rect x="226" y="150" width="160" height="70" rx="16" fill="#fff" stroke="#151821" stroke-width="3"/><text x="306" y="180" font-weight="700">Black swan</text><text x="306" y="198">one counter-example</text>
+        <rect x="24" y="240" width="160" height="70" rx="16" fill="#fff" stroke="#2f5bd8" stroke-width="2"/><text x="104" y="270" font-weight="700">Karl Popper</text><text x="104" y="288">1934</text>
+        <rect x="226" y="240" width="160" height="70" rx="16" fill="#fff" stroke="#b4561d" stroke-width="2"/><text x="306" y="270" font-weight="700">Demarcation</text><text x="306" y="288">science vs not</text>
+        <rect x="112" y="330" width="188" height="56" rx="16" fill="#fff" stroke="#c62f2f" stroke-width="2" stroke-dasharray="6 4"/><text x="206" y="355" font-weight="700" fill="#c62f2f">Criticism: Duhem–Quine</text><text x="206" y="372" fill="#5d667d" font-size="11.5">a test hits many assumptions</text>
+      </g>
+      
+    </svg>
+    <div class="scale-top"><span class="ib dark" style="width:40px;height:40px"><svg><use href="#i-prev"/></svg></span><div class="search">Mental tools › Falsification</div></div>
+    <div style="position:absolute;left:10px;right:10px;top:400px" class="levelpill"><span class="ib">↑</span><div class="lvl">Level 5 of 6<small>Parts of Falsification</small></div><span class="ib">↓</span></div>
+    <div class="drawer" style="height:245px">
+      <div class="grab"></div>
+      <div class="small muted">Side chat · about <b style="color:var(--text)">Black swan</b> · short answers</div>
+      <div class="msg me" style="font-size:13.5px">Short: what’s the black swan?</div>
+      <div class="msg ai" style="font-size:13.5px">A million white swans can’t prove “all swans are white”; one black swan disproves it.</div>
+      <div class="actions"><span class="chip">＋ Add to map</span><span class="chip">Open full answer</span><span class="chip">Bookmark</span></div>
+    </div>
+  </div>
+  <div class="dock"><div class="askrow"><div class="input">Quick question about Black swan…</div><span class="btn primary">Ask</span></div></div>
+</div>
+</div></div>
+
+<!-- B Orbits -->
+<div class="item" id="b"><h2>B · Orbits</h2>
+<div class="phone">
+  <div class="status"><span>12:32</span><span>●●● 81%</span></div>
+  <div class="top"><span class="crumb">Epistemology</span><span class="muted">›</span><span class="crumb on">Mental tools</span><span class="grow"></span><span class="ib"><svg><use href="#i-search"/></svg></span></div>
+  <div class="body" style="background:#11131a">
+    <svg viewBox="0 0 412 660" width="412" height="660" style="position:absolute;inset:0">
+      <path d="M-20 70 Q206 -40 432 70" fill="none" stroke="#9c8ee0" stroke-width="2" stroke-dasharray="3 6"/>
+      <text x="206" y="92" text-anchor="middle" fill="#9c8ee0" font-size="12">↑ level above: Epistemology</text>
+      <circle cx="206" cy="330" r="185" fill="none" stroke="#3a3f52" stroke-width="1.5"/>
+      <circle cx="206" cy="330" r="110" fill="none" stroke="#4a4f66" stroke-width="1.5" stroke-dasharray="4 5"/>
+      <circle cx="206" cy="330" r="54" fill="#f5b83d"/>
+      <circle cx="206" cy="330" r="64" fill="none" stroke="#f5b83d" stroke-opacity=".3" stroke-width="10"/>
+      <text x="206" y="335" text-anchor="middle" font-size="14" font-weight="800" fill="#11131a">Falsification</text>
+      <g font-size="11" fill="#e8eaf0" text-anchor="middle">
+        <circle cx="206" cy="220" r="12" fill="#4fb3a6"/><text x="206" y="250">Testable prediction</text>
+        <circle cx="309" cy="292" r="12" fill="#e8eaf0"/><text x="309" y="320">Black swan</text>
+        <circle cx="277" cy="414" r="12" fill="#7aa2ff"/><text x="277" y="442">Popper</text>
+        <circle cx="135" cy="414" r="12" fill="#ff9a5c"/><text x="135" y="442">Demarcation</text>
+        <circle cx="103" cy="292" r="12" fill="#ff7b7b"/><text x="103" y="320">Duhem–Quine</text>
+      </g>
+      <g font-size="12" fill="#c9cede" text-anchor="middle">
+        <circle cx="206" cy="145" r="20" fill="#2a2f3a" stroke="#8b93a7"/><text x="206" y="150" font-size="10">Occam</text>
+        <circle cx="388" cy="298" r="20" fill="#2a2f3a" stroke="#8b93a7"/><text x="372" y="338">Inversion</text>
+        <circle cx="325" cy="472" r="20" fill="#2a2f3a" stroke="#8b93a7"/><text x="325" y="508">Bayes</text>
+        <circle cx="87" cy="472" r="20" fill="#2a2f3a" stroke="#8b93a7"/><text x="87" y="508">First principles</text>
+        <circle cx="24" cy="298" r="20" fill="#2a2f3a" stroke="#8b93a7" stroke-dasharray="4 3"/><text x="40" y="338">＋ more?</text>
+      </g>
+      <text x="206" y="560" text-anchor="middle" fill="#8b93a7" font-size="11.5">inner ring = parts of Falsification (one level down)</text>
+      <text x="206" y="580" text-anchor="middle" fill="#8b93a7" font-size="11.5">outer ring = other tools on the same level</text>
+      <text x="206" y="600" text-anchor="middle" fill="#8b93a7" font-size="11.5">tap any planet to make it the sun</text>
+    </svg>
+  </div>
+  <div class="dock"><div class="actions"><span class="chip">＋ More tools on this level</span><span class="chip on">Question Falsification ↓</span></div>
+    <div class="askrow"><div class="input">Ask about Falsification…</div><span class="btn primary">Ask</span></div></div>
+</div></div>
+
+<!-- C Strata -->
+<div class="item" id="c"><h2>C · Strata: one layer per level</h2>
+<div class="phone">
+  <div class="status"><span>12:33</span><span>●●● 80%</span></div>
+  <div class="top"><b class="grow">How do I know a theory is wrong?</b><span class="ib"><svg><use href="#i-search"/></svg></span></div>
+  <div class="body">
+    <div class="band thin"><div class="ln">Level 1<b>Know-ledge</b></div><div class="row"><span class="pebble">Science</span><span class="pebble">Philosophy</span><span class="pebble">Art</span><span class="pebble">Math</span></div></div>
+    <div class="band thin"><div class="ln">Level 2<b>Philo-sophy</b></div><div class="row"><span class="pebble">Ethics</span><span class="pebble" style="border-color:#5b3fd0">Epistemology</span><span class="pebble">Logic</span><span class="pebble">Metaphysics</span></div></div>
+    <div class="band thin"><div class="ln">Level 3<b>Episte-mology</b></div><div class="row"><span class="pebble">Truth</span><span class="pebble" style="border-color:#5b3fd0">Mental tools</span><span class="pebble">Skepticism</span><span class="pebble">Evidence</span></div></div>
+    <div class="band cur" style="min-height:250px"><div class="ln">Level 4<b>Mental tools</b><br/>6 found<br/>← scroll →</div>
+      <div class="row" style="flex-wrap:wrap;align-content:center">
+        <span class="pebble hero">Falsification<br/><span style="font-weight:400;font-size:12px;color:var(--muted)">could a test prove it wrong?</span></span>
+        <span class="pebble ghost">Occam’s razor</span><span class="pebble ghost">Inversion</span><span class="pebble ghost">First principles</span><span class="pebble ghost">Bayesian updating</span><span class="pebble ghost">Steelmanning</span>
+        <span class="chip" style="width:100%;justify-content:center">＋ What other tools are on this level?</span>
+      </div></div>
+    <div class="band" style="min-height:120px;background:#fbfaff"><div class="ln">Level 5<b>Parts</b></div><div class="row" style="flex-wrap:wrap;align-content:center"><span class="pebble">Testable prediction</span><span class="pebble">Black swan</span><span class="pebble">Popper 1934</span><span class="pebble">Demarcation</span><span class="pebble" style="color:#c62f2f">Duhem–Quine</span></div></div>
+    <div class="band thin"><div class="ln">Level 6<b>Exam-ples</b></div><div class="row"><span class="pebble ghost">tap a part to fill this layer</span></div></div>
+  </div>
+  <div class="dock"><div class="askrow"><div class="input">Ask about Falsification…</div><span class="btn primary">Ask</span></div></div>
+</div></div>
+
+<!-- D Circle packing -->
+<div class="item" id="d"><h2>D · Zoomable circle packing</h2>
+<div class="phone">
+  <div class="status"><span>12:34</span><span>●●● 79%</span></div>
+  <div class="top"><span class="crumb">Philosophy</span><span class="muted">›</span><span class="crumb on">Epistemology</span><span class="grow"></span><span class="ib"><svg><use href="#i-fit"/></svg></span></div>
+  <div class="body">
+    <svg viewBox="0 0 412 660" width="412" height="660" style="position:absolute;inset:0">
+      <circle cx="206" cy="320" r="200" fill="#efeafd" stroke="#9c8ee0" stroke-width="2"/>
+      <text x="206" y="146" text-anchor="middle" font-size="13" font-weight="700" fill="#5b3fd0">EPISTEMOLOGY</text>
+      <circle cx="236" cy="290" r="135" fill="#e2dafb" stroke="#5b3fd0" stroke-width="2"/>
+      <text x="236" y="178" text-anchor="middle" font-size="12.5" font-weight="700" fill="#5b3fd0">Mental tools</text>
+      <circle cx="226" cy="282" r="80" fill="#fff" stroke="#5b3fd0" stroke-width="3"/>
+      <text x="226" y="236" text-anchor="middle" font-size="13.5" font-weight="800">Falsification</text>
+      <g text-anchor="middle" font-size="9">
+        <circle cx="194" cy="266" r="20" fill="#e3f4f1" stroke="#1f8f82"/><text x="194" y="269">Testable</text>
+        <circle cx="246" cy="262" r="20" fill="#eceff6" stroke="#151821"/><text x="246" y="265">Swan</text>
+        <circle cx="186" cy="312" r="20" fill="#e9effd" stroke="#2f5bd8"/><text x="186" y="315">Popper</text>
+        <circle cx="230" cy="318" r="20" fill="#fdeee4" stroke="#b4561d"/><text x="230" y="321">Demarc.</text>
+        <circle cx="272" cy="302" r="17" fill="#fde6e6" stroke="#c62f2f"/><text x="272" y="305">D–Q</text>
+      </g>
+      <g text-anchor="middle" font-size="10.5" fill="#5d667d">
+        <circle cx="325" cy="230" r="24" fill="#fff" stroke="#9c8ee0" stroke-dasharray="4 3"/><text x="325" y="234">Occam</text>
+        <circle cx="328" cy="318" r="26" fill="#fff" stroke="#9c8ee0" stroke-dasharray="4 3"/><text x="328" y="322">Inversion</text>
+        <circle cx="282" cy="392" r="22" fill="#fff" stroke="#9c8ee0" stroke-dasharray="4 3"/><text x="282" y="396">Bayes</text>
+        <circle cx="178" cy="376" r="26" fill="#fff" stroke="#9c8ee0" stroke-dasharray="4 3"/><text x="178" y="373">First</text><text x="178" y="385">princ.</text>
+      </g>
+      <g text-anchor="middle" font-size="11">
+        <circle cx="88" cy="410" r="32" fill="#f6f3ff" stroke="#9c8ee0"/><text x="88" y="414">Skepticism</text>
+        <circle cx="150" cy="470" r="28" fill="#f6f3ff" stroke="#9c8ee0"/><text x="150" y="474">Truth</text>
+        <circle cx="236" cy="474" r="26" fill="#f6f3ff" stroke="#9c8ee0"/><text x="236" y="478">Evidence</text>
+      </g>
+      <text x="206" y="550" text-anchor="middle" font-size="12" fill="#5d667d">Bubbles inside bubbles = levels inside levels</text>
+      <text x="206" y="572" text-anchor="middle" font-size="12" fill="#5d667d">Tap a bubble to zoom it to full screen · tap outside to zoom out</text>
+    </svg>
+  </div>
+  <div class="dock"><div class="actions"><span class="chip">＋ More mental tools</span><span class="chip on">Question Falsification ↓</span></div>
+    <div class="askrow"><div class="input">Ask about Falsification…</div><span class="btn primary">Ask</span></div></div>
+</div></div>
+
+<!-- E Treemap -->
+<div class="item" id="e"><h2>E · Zoomable treemap</h2>
+<div class="phone">
+  <div class="status"><span>12:35</span><span>●●● 78%</span></div>
+  <div class="top" style="gap:4px;overflow:hidden"><span class="crumb" style="padding:0 8px">Knowl.</span><span class="crumb" style="padding:0 8px">Philos.</span><span class="crumb" style="padding:0 8px">Epist.</span><span class="crumb on">Mental tools</span></div>
+  <div class="body" style="padding:10px">
+    <div style="display:grid;grid-template-columns:1.6fr 1fr;grid-template-rows:1.6fr 1fr 1fr;gap:6px;height:560px">
+      <div style="grid-row:1/3;border-radius:14px;background:#5b3fd0;color:#fff;padding:10px;display:flex;flex-direction:column;gap:6px">
+        <b style="font-size:17px">Falsification</b><span style="font-size:12px;opacity:.85">asked 4× · 5 parts</span>
+        <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:5px">
+          <div style="background:rgba(255,255,255,.22);border-radius:10px;padding:6px;font-size:12.5px">Black swan<br/><small>2 questions</small></div>
+          <div style="background:rgba(255,255,255,.16);border-radius:10px;padding:6px;font-size:12.5px">Testable prediction</div>
+          <div style="background:rgba(255,255,255,.12);border-radius:10px;padding:6px;font-size:12.5px">Popper 1934</div>
+          <div style="background:rgba(255,255,255,.12);border-radius:10px;padding:6px;font-size:12.5px">Demarcation</div>
+          <div style="grid-column:1/3;background:rgba(255,120,120,.35);border-radius:10px;padding:6px;font-size:12.5px">Criticism: Duhem–Quine</div>
+        </div>
+      </div>
+      <div style="border-radius:14px;background:#2f5bd8;color:#fff;padding:10px"><b>First principles</b><br/><small>asked 2×</small></div>
+      <div style="border-radius:14px;background:#1f8f82;color:#fff;padding:10px"><b>Occam’s razor</b><br/><small>asked 1×</small></div>
+      <div style="border-radius:14px;border:2px dashed #9c8ee0;color:var(--muted);padding:10px;font-size:13px">Inversion<br/><small>not asked yet</small></div>
+      <div style="border-radius:14px;border:2px dashed #9c8ee0;color:var(--muted);padding:10px;font-size:13px">Bayesian updating · Steelmanning<br/><small>not asked yet</small></div>
+    </div>
+    <p class="note" style="margin:8px 2px">Size = how much you explored. Tap a block to zoom into it; the trail on top climbs back up.</p>
+  </div>
+  <div class="dock"><div class="actions"><span class="chip">＋ More tools</span><span class="chip on">Question Falsification ↓</span></div>
+    <div class="askrow"><div class="input">Ask about Falsification…</div><span class="btn primary">Ask</span></div></div>
+</div></div>
+
+<!-- F Elevator + side chat -->
+<div class="item" id="f"><h2>F · Level elevator + side chat</h2>
+<div class="phone">
+  <div class="status"><span>12:36</span><span>●●● 77%</span></div>
+  <div class="top"><b class="grow">Mental tools</b><span class="chip">＋ More on this level</span></div>
+  <div class="body" style="display:flex;flex-direction:column">
+    <div style="display:flex;flex:0 0 380px;min-height:0">
+      <div class="ladder">
+        <div class="rung">1<b>Knowl.</b></div><div class="shaft"></div>
+        <div class="rung">2<b>Philos.</b></div><div class="shaft"></div>
+        <div class="rung">3<b>Epist.</b></div><div class="shaft"></div>
+        <div class="rung on">4<b>Tools</b></div><div class="shaft"></div>
+        <div class="rung">5<b>Parts</b></div><div class="shaft"></div>
+        <div class="rung">6<b>Exam.</b></div>
+      </div>
+      <div style="flex:1;padding:10px;overflow:hidden">
+        <div class="lrow on">Falsification <span class="n">5 parts ›</span></div>
+        <div class="small" style="margin:-2px 4px 8px;color:var(--muted)">A theory is scientific only if an observation could prove it wrong.</div>
+        <div class="lrow">First principles <span class="n">3 ›</span></div>
+        <div class="lrow">Occam’s razor <span class="n">2 ›</span></div>
+        <div class="lrow ghost">Inversion <span class="n">ask</span></div>
+        <div class="lrow ghost">Bayesian updating <span class="n">ask</span></div>
+        <div class="lrow ghost">Steelmanning <span class="n">ask</span></div>
+      </div>
+    </div>
+    <div class="handle"><i></i></div>
+    <div class="chat" style="flex:1;min-height:0;overflow:hidden">
+      <div class="ctx">Side chat about <b>Falsification</b> · quick, short answers</div>
+      <div class="msg me">Is astrology falsifiable?</div>
+      <div class="msg ai">Its vague predictions fit any outcome, so it can’t be proven wrong; by Popper’s test it isn’t science.<br/><span class="chip add">＋ Add to level 5</span></div>
+    </div>
+  </div>
+  <div class="dock"><div class="askrow"><div class="input">Quick question about Falsification…</div><span class="btn primary">Ask</span></div></div>
+</div></div>
+
+</div>
+</body></html>
