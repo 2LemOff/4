@@ -8,11 +8,22 @@ import { planEffort } from "./effort";
 import { splitBlocks } from "./blocks";
 import { makeFreshCard } from "./context";
 import { defaultEmbeddingModel, roleDefaults } from "./models";
-import { rerankPrompt, SEED_PROMPT, TAG_PROMPT } from "./prompts";
-import { hitText, keywordSearch, topCards } from "./search";
+import { rerankPrompt, SEED_PROMPT, sessionPrompt, TAG_PROMPT, usesPyramids } from "./prompts";
+import { ANSWER_SCHEMA, answerTitle, parseAnswer, prefixFor, pruneCrossLinks, textAnswer, type Answer } from "./answer";
+import { hitText, keywordSearch, quantize, topCards } from "./search";
 import type { Anchor, Card, ModelSettings, Session } from "./types";
 
 const apiKey = () => settingsStore.get().apiKey;
+
+/** Node-id prefix of a card: K{seq} for pyramid answers, a card-based prefix for converted v1 answers. */
+export const cardPrefix = (c: Pick<Card, "id" | "seq">) => (c.seq !== undefined ? prefixFor(c.seq) : `C${c.id}`);
+
+/** The answer as pyramids: stored for v2 cards, converted from paragraphs for v1 cards. */
+export function cardAnswer(c: Card): Answer | undefined {
+  if (c.answer) return c.answer;
+  const text = c.assistant?.content || c.blocks.join("\n\n");
+  return text.trim() ? textAnswer(text, cardPrefix(c)) : undefined;
+}
 
 export function settingsFor(modelId: string): ModelSettings {
   return settingsStore.get().modelSettings[modelId] ?? defaultSettings(modelInfo(modelId));
@@ -47,7 +58,7 @@ export async function ask(o: AskOptions): Promise<{ cardId: string; sessionId: s
       title: o.question.slice(0, 80),
       rootCardId: cardId,
       lastCardId: cardId,
-      systemPrompt: settingsStore.get().systemPrompt,
+      systemPrompt: sessionPrompt(settingsStore.get().systemPrompt),
       answerModel: o.model,
       createdAt: now,
       updatedAt: now,
@@ -56,9 +67,13 @@ export async function ask(o: AskOptions): Promise<{ cardId: string; sessionId: s
   } else {
     await db.sessions.update(sessionId, { lastCardId: cardId, updatedAt: now });
   }
+  const session = await db.sessions.get(sessionId);
+  const siblings = await db.cards.where("sessionId").equals(sessionId).toArray();
+  const seq = session && usesPyramids(session.systemPrompt) ? siblings.reduce((m, c) => Math.max(m, c.seq ?? 0), 0) + 1 : undefined;
   const card: Card = {
     id: cardId,
     sessionId,
+    seq,
     parentId: o.parentId,
     anchor: o.anchor,
     question: o.question,
@@ -74,7 +89,7 @@ export async function ask(o: AskOptions): Promise<{ cardId: string; sessionId: s
 }
 
 /** (Re)run the answer for an existing card. */
-export async function run(cardId: string): Promise<void> {
+export async function run(cardId: string, opts: { noSchema?: boolean } = {}): Promise<void> {
   const card = await db.cards.get(cardId);
   if (!card) return;
   const session = await db.sessions.get(card.sessionId);
@@ -107,17 +122,23 @@ export async function run(cardId: string): Promise<void> {
   }
   await db.cards.update(cardId, { configUpdate, effortUsed: nextEffort, status: "streaming", error: undefined });
 
-  const messages: ChatMessage[] = buildMessages(idx, card.parentId, card.question, card.anchor, {
-    systemPrompt: session.systemPrompt,
-    model: card.model,
-    includeConfigUpdates: canUpdate,
-    newConfigUpdate: configUpdate,
-  });
-  const body = {
+  const messages: ChatMessage[] = buildMessages(
+    idx,
+    card.parentId,
+    card.question,
+    card.anchor,
+    { systemPrompt: session.systemPrompt, model: card.model, includeConfigUpdates: canUpdate, newConfigUpdate: configUpdate },
+    card.seq,
+  );
+  const pyramidMode = usesPyramids(session.systemPrompt) && card.seq !== undefined;
+  const body: Record<string, unknown> = {
     model: card.model,
     messages: prepareMessages(card.model, messages),
     ...buildRequestParams(effective, model),
   };
+  if (pyramidMode && !opts.noSchema && model.supported_parameters?.includes("structured_outputs")) {
+    body.response_format = { type: "json_schema", json_schema: { name: "pyramid_answer", strict: true, schema: ANSWER_SCHEMA } };
+  }
 
   streamStore.set((s) => ({ ...s, [cardId]: { content: "", reasoning: "" } }));
   try {
@@ -129,12 +150,17 @@ export async function run(cardId: string): Promise<void> {
     const exhausted = reasoningExhausted(st.usage, st.finishReason);
     const status: Card["status"] =
       st.finishReason === "content_filter" ? "refused" : st.finishReason === "length" ? "length" : st.error ? "error" : "done";
+    const known = new Set(all.flatMap((c) => c.answer?.nodes.map((n) => n.id) ?? []));
+    const parsed = st.content.trim() ? parseAnswer(st.content, cardPrefix(card)) : undefined;
+    const answer = parsed ? pruneCrossLinks(parsed, known) : undefined;
     await db.cards.update(cardId, {
       status,
       error: exhausted
         ? "Ran out of room while thinking"
         : st.error ?? (status === "length" ? "The answer was cut off at the token limit." : undefined),
-      blocks: splitBlocks(st.content),
+      answer,
+      tag: answerTitle(answer)?.slice(0, 32),
+      blocks: answer ? answer.nodes.map((n) => n.text) : splitBlocks(st.content),
       assistant: {
         content: st.content,
         reasoning: st.reasoning || undefined,
@@ -148,6 +174,10 @@ export async function run(cardId: string): Promise<void> {
     if (st.content) void afterAnswer(cardId);
   } catch (e) {
     // a model that rejects mid-conversation updates: remember it and retry once without them
+    if (e instanceof OpenRouterError && e.status === 400 && body.response_format && /response_format|schema|structured/i.test(e.message)) {
+      clearStream(cardId);
+      return run(cardId, { ...opts, noSchema: true });
+    }
     if (e instanceof OpenRouterError && e.status === 400 && configUpdate && /configuration_update|effort/i.test(e.message)) {
       updateSettings((s) => ({ blockedConfigUpdate: [...s.blockedConfigUpdate, card.model] }));
       clearStream(cardId);
@@ -173,7 +203,7 @@ async function afterAnswer(cardId: string) {
 export async function generateTag(cardId: string) {
   const card = await db.cards.get(cardId);
   const id = roleModel("tags");
-  if (!card?.assistant || !id || !apiKey()) return;
+  if (!card?.assistant || card.tag || !id || !apiKey()) return;
   const m = modelInfo(id);
   const extra = buildRequestParams({ reasoning: { effort: "low" }, max_tokens: 2000 }, m);
   const { data } = await completeJSON<{ tag: string }>({
@@ -181,7 +211,7 @@ export async function generateTag(cardId: string) {
     model: m,
     messages: [
       { role: "system", content: TAG_PROMPT },
-      { role: "user", content: `Q: ${card.anchor?.text ?? card.question}\n${card.question}\n\nA: ${card.assistant.content.slice(0, 800)}` },
+      { role: "user", content: `Q: ${card.question}\n\nA: ${card.blocks.join(" ").slice(0, 800)}` },
     ],
     schemaName: "tag",
     schema: { type: "object", additionalProperties: false, required: ["tag"], properties: { tag: { type: "string" } } },
@@ -202,7 +232,7 @@ export async function embedCards(cardIds: string[]) {
   for (let i = 0; i < items.length; i += 64) {
     const chunk = items.slice(i, i + 64);
     const vecs = await embed(apiKey(), model, chunk.map((x) => x.text.slice(0, 2000)));
-    await db.vectors.bulkPut(chunk.map((x, k) => ({ cardId: x.cardId, blockIdx: x.blockIdx, model, vector: Float32Array.from(vecs[k]) })));
+    await db.vectors.bulkPut(chunk.map((x, k) => ({ cardId: x.cardId, blockIdx: x.blockIdx, model, vector: quantize(vecs[k]) })));
   }
 }
 
@@ -294,6 +324,12 @@ export async function startFreshBranch(fromCardId: string): Promise<string> {
   if (!summary.trim()) throw new Error("Could not summarize this branch.");
   const fresh = makeFreshCard(from, summary.trim(), uid(), Date.now());
   fresh.tag = "Fresh start";
+  const session = await db.sessions.get(from.sessionId);
+  if (session && usesPyramids(session.systemPrompt)) {
+    fresh.seq = all.reduce((m, c) => Math.max(m, c.seq ?? 0), 0) + 1;
+  }
+  fresh.answer = textAnswer(summary.trim(), cardPrefix(fresh));
+  fresh.blocks = fresh.answer.nodes.map((n) => n.text);
   await db.cards.put(fresh);
   await db.sessions.update(from.sessionId, { lastCardId: fresh.id, updatedAt: Date.now() });
   void embedCards([fresh.id]).catch(() => {});

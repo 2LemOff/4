@@ -2,7 +2,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { liveQuery } from "dexie";
 import { kvGet, kvSet } from "./db";
 import type { ModelInfo, ModelSettings, SynthesisSettings } from "./types";
-import { DEFAULT_SYNTHESIS, DEFAULT_SYSTEM_PROMPT } from "./prompts";
+import { DEFAULT_SYNTHESIS, DEFAULT_SYSTEM_PROMPT, OLD_PREMISE_FORMAT, PROMPT_PARTS } from "./prompts";
 import { listModels } from "./openrouter";
 
 type Listener = () => void;
@@ -48,6 +48,9 @@ export interface AppSettings {
   synthesis: SynthesisSettings;
   /** models that answered 400 to a mid-conversation effort update */
   blockedConfigUpdate: string[];
+  lastBackupAt?: number;
+  /** remind after this many days without a backup (0 = never) */
+  backupReminderDays: number;
 }
 
 export const defaultAppSettings = (): AppSettings => ({
@@ -57,6 +60,7 @@ export const defaultAppSettings = (): AppSettings => ({
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
   synthesis: DEFAULT_SYNTHESIS,
   blockedConfigUpdate: [],
+  backupReminderDays: 7,
 });
 
 export const settingsStore = createStore<AppSettings>(defaultAppSettings());
@@ -108,7 +112,12 @@ export const streamStore = createStore<Record<string, StreamView>>({});
 
 export async function initApp() {
   const saved = await kvGet<AppSettings>("settings");
-  if (saved) settingsStore.set({ ...defaultAppSettings(), ...saved });
+  if (saved) {
+    const merged = { ...defaultAppSettings(), ...saved };
+    // v1 prompts asked for blank-line paragraphs, which conflicts with the pyramid format
+    merged.systemPrompt = merged.systemPrompt.replace(OLD_PREMISE_FORMAT, PROMPT_PARTS.premiseFormat);
+    settingsStore.set(merged);
+  }
   const cached = await kvGet<ModelsState>("models");
   if (cached) modelsStore.set({ ...cached, loading: false });
   void refreshModels();

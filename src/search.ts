@@ -1,5 +1,15 @@
 import type { Card } from "./types";
 
+/** Int8 copy of a vector (scaled to the largest component). Cosine similarity is unaffected by the scale. */
+export function quantize(v: ArrayLike<number>): Int8Array {
+  let max = 0;
+  for (let i = 0; i < v.length; i++) max = Math.max(max, Math.abs(v[i]));
+  const out = new Int8Array(v.length);
+  if (!max) return out;
+  for (let i = 0; i < v.length; i++) out[i] = Math.round((v[i] / max) * 127);
+  return out;
+}
+
 export function cosine(a: ArrayLike<number>, b: ArrayLike<number>): number {
   let dot = 0, na = 0, nb = 0;
   const n = Math.min(a.length, b.length);

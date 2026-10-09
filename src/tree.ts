@@ -38,10 +38,15 @@ export interface ChatMessage {
   configuration_update?: { reasoning: { effort: string } };
 }
 
-export function userTurn(anchor: Anchor | undefined, question: string): string {
-  return anchor
-    ? `About this statement from your previous answer: "${anchor.text}"\n\nMy question: ${question}`
-    : question;
+export function userTurn(anchor: Anchor | undefined, question: string, seq?: number): string {
+  let q = question;
+  if (anchor && anchor.scope === "pyramid") q = `About this pyramid from your previous answer:\n${anchor.text}\n\nMy question: ${question}`;
+  else if (anchor && anchor.scope === "category") q = `About this category from your previous answer:\n${anchor.text}\n\nMy question: ${question}`;
+  else if (anchor && anchor.quotes && anchor.quotes.length > 1)
+    q = `About these points from your previous answers:\n${anchor.quotes.map((t) => `- "${t}"`).join("\n")}\n\nMy question: ${question}`;
+  else if (anchor && anchor.nodeIds) q = `About this point from your previous answer: "${anchor.text}"\n\nMy question: ${question}`;
+  else if (anchor) q = `About this statement from your previous answer: "${anchor.text}"\n\nMy question: ${question}`;
+  return seq !== undefined ? `${q}\n\n(Answer id prefix: K${seq})` : q;
 }
 
 export interface BuildOptions {
@@ -65,6 +70,7 @@ export function buildMessages(
   question: string,
   anchor: Anchor | undefined,
   opts: BuildOptions,
+  seq?: number,
 ): ChatMessage[] {
   const msgs: ChatMessage[] = [{ role: "system", content: opts.systemPrompt }];
   const path = parentId ? pathToRoot(idx, parentId) : [];
@@ -73,7 +79,7 @@ export function buildMessages(
     if (opts.includeConfigUpdates && c.configUpdate) {
       msgs.push({ role: "system", content: "", configuration_update: { reasoning: { effort: c.configUpdate.effort } } });
     }
-    msgs.push({ role: "user", content: userTurn(c.anchor, c.question) });
+    msgs.push({ role: "user", content: userTurn(c.anchor, c.question, c.seq) });
     const a: ChatMessage = { role: "assistant", content: c.assistant.content };
     if (c.model === opts.model) {
       if (c.assistant.reasoning_details?.length) a.reasoning_details = c.assistant.reasoning_details;
@@ -84,7 +90,7 @@ export function buildMessages(
   if (opts.includeConfigUpdates && opts.newConfigUpdate) {
     msgs.push({ role: "system", content: "", configuration_update: { reasoning: { effort: opts.newConfigUpdate.effort } } });
   }
-  msgs.push({ role: "user", content: userTurn(anchor, question) });
+  msgs.push({ role: "user", content: userTurn(anchor, question, seq) });
   return msgs;
 }
 
@@ -92,7 +98,7 @@ export function buildMessages(
 export function drillCounts(idx: CardIndex, id: string): Map<string, number> {
   const m = new Map<string, number>();
   for (const c of children(idx, id)) {
-    if (!c.anchor) continue;
+    if (!c.anchor || c.anchor.blockIdx === undefined) continue;
     const k = `${c.anchor.blockIdx}:${c.anchor.sentenceIdx}`;
     m.set(k, (m.get(k) ?? 0) + 1);
   }

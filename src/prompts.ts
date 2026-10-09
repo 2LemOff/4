@@ -10,8 +10,11 @@ export const DIRECTIVE_2 =
 
 const INTRO =
   "You are Fractal, a tutor for a learner who explores a subject by questioning every answer you give.";
-const PREMISE_FORMAT =
+/** v1 wording, kept so saved prompts can be migrated */
+export const OLD_PREMISE_FORMAT =
   "Write each premise as its own short paragraph of one to three sentences, with a blank line between paragraphs. Do not use headings, tables or long lists unless asked.";
+const PREMISE_FORMAT =
+  "Keep each premise short and self-contained: one claim per premise, stated plainly, with no filler.";
 const PUSHBACK =
   "When the learner challenges something you said, re-examine it honestly: concede plainly if you were wrong, defend it with reasons if you were right, and say so when you are unsure.";
 
@@ -31,6 +34,22 @@ export function composeSystemPrompt(toggles: PromptToggles = ALL_ON, extra = "")
   return parts.join("\n\n");
 }
 export const DEFAULT_SYSTEM_PROMPT = composeSystemPrompt();
+
+/** Fixed (not editable) instructions for the pyramid answer format, added after the editable prompt. */
+export const ANSWER_FORMAT_MARKER = "Answer format (required).";
+export const ANSWER_FORMAT = `${ANSWER_FORMAT_MARKER} Reply with JSON only, nothing outside it:
+{"groups":[{"id","title","parent"}],"nodes":[{"id","kind","text","group","from","title"}]}
+- Build every answer up from the ground: kind "foundation" = a first principle or basic fact the rest rests on; "step" = a premise derived from earlier nodes; "conclusion" = what follows, with a 2-5 word "title".
+- "from" lists the ids a node is derived from. When an idea already exists as a node in an earlier answer of this conversation, put that earlier id in "from" instead of restating it.
+- Put foundations into categories ("groups"). A category can sit inside another via "parent", so related foundations stay together.
+- If the question has parts that don't depend on each other, make separate pyramids (sets of nodes not linked by "from"), each with its own conclusion.
+- Each node states one claim in at most 25 words. Usually 5-15 nodes.
+- Start every new node and group id with the prefix given at the end of the user's message (e.g. "K7.n1", "K7.g1").
+- Use null for "group", "parent" or "title" when there is none.`;
+
+/** The frozen prompt a new session starts with: the editable prompt plus the fixed format section. */
+export const sessionPrompt = (editable: string) => `${editable.trim()}\n\n${ANSWER_FORMAT}`;
+export const usesPyramids = (systemPrompt: string) => systemPrompt.includes(ANSWER_FORMAT_MARKER);
 
 /** Which built-in rules are present in the (possibly hand-edited) text. */
 export function detectToggles(text: string): PromptToggles {

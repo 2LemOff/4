@@ -72,6 +72,26 @@ export interface Calls {
   embeddings: any[];
 }
 
+/** A pyramid answer in the app's JSON format, using the id prefix the app sends. Later answers build on K1.n2. */
+export function pyramidAnswer(prefix: string): string {
+  const P = prefix;
+  const builds = P !== "K1" ? ["K1.n2"] : [];
+  return JSON.stringify({
+    groups: [
+      { id: `${P}.g1`, title: "Light", parent: null },
+      { id: `${P}.g2`, title: "Scattering", parent: `${P}.g1` },
+    ],
+    nodes: [
+      { id: `${P}.n1`, kind: "foundation", text: `Light is made of waves of different lengths (${P}).`, group: `${P}.g1`, from: [], title: null },
+      { id: `${P}.n2`, kind: "foundation", text: "Tiny particles scatter short waves more than long ones.", group: `${P}.g2`, from: builds, title: null },
+      { id: `${P}.n3`, kind: "step", text: "Air molecules scatter blue light the most.", group: null, from: [`${P}.n1`, `${P}.n2`], title: null },
+      { id: `${P}.n4`, kind: "conclusion", text: "So the sky looks blue from the ground.", group: null, from: [`${P}.n3`], title: "Blue sky" },
+      { id: `${P}.n5`, kind: "foundation", text: "An observer only sees light that reaches their eyes.", group: null, from: [], title: null },
+      { id: `${P}.n6`, kind: "conclusion", text: "What you see depends on where you stand.", group: null, from: [`${P}.n5`], title: "Observer view" },
+    ],
+  });
+}
+
 const ANSWER = "Premise one is simple.\n\nPremise two depends on it. It has a second sentence about observers.\n\nPremise three concludes.";
 
 export async function mockOpenRouter(page: Page, opts: MockOptions = {}): Promise<Calls> {
@@ -104,13 +124,14 @@ export async function mockOpenRouter(page: Page, opts: MockOptions = {}): Promis
       if (body.stream) {
         calls.stream.push(body);
         const o = opts.stream?.(body) ?? {};
-        const text = opts.answer ? opts.answer(userText, body) : ANSWER;
+        const prefix = userText.match(/\(Answer id prefix: (K\d+)\)$/)?.[1];
+        const text = opts.answer ? opts.answer(userText, body) : prefix ? pyramidAnswer(prefix) : ANSWER;
         const chunks: unknown[] = [];
         if (o.reasoning !== false) {
           chunks.push({ choices: [{ delta: { reasoning: "Let me think. ", reasoning_details: [{ type: "reasoning.text", text: "Let me think. ", index: 0, id: "r1", format: "google-gemini-v1" }] } }] });
           chunks.push({ choices: [{ delta: { reasoning_details: [{ type: "reasoning.text", text: "", signature: "SIG123", index: 0, id: "r1", format: "google-gemini-v1" }] } }] });
         }
-        for (let i = 0; i < text.length; i += 24) chunks.push({ id: `gen-${++n}`, choices: [{ delta: { content: text.slice(i, i + 24) } }] });
+        for (let i = 0; i < text.length; i += 120) chunks.push({ id: `gen-${++n}`, choices: [{ delta: { content: text.slice(i, i + 120) } }] });
         chunks.push({ choices: [{ delta: {}, finish_reason: o.finish ?? "stop" }] });
         chunks.push({ choices: [{ delta: {}, finish_reason: o.finish ?? "stop" }], usage: o.usage ?? { prompt_tokens: 120, completion_tokens: 60, cost: 0.0012, completion_tokens_details: { reasoning_tokens: 20 } } });
         const body2 = ": OPENROUTER PROCESSING\n\n" + chunks.map((c) => `data: ${JSON.stringify(c)}\n\n`).join("") + "data: [DONE]\n\n";

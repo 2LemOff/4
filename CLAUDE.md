@@ -19,7 +19,7 @@ Playwright uses the pre-installed Chromium at `/opt/pw-browsers/chromium-1194/ch
 
 ## What this is
 
-Fractal is a mobile-only PWA (Vite + React + TypeScript, no backend). A session is a **tree of cards**; each card is one question and the AI's answer, split into blocks and tappable sentences. All data is in IndexedDB (Dexie); the user's OpenRouter key lives in the same store. `IDEA.md` is the product spec: read it before changing behavior.
+Fractal is a mobile-only PWA (Vite + React + TypeScript, no backend). A session ("topic") is a **tree of cards**; each card is one question and the AI's answer. Answers are **pyramids** (JSON: foundations in nested categories → steps → conclusions, node ids `K{seq}.nX`) drawn on a pan/zoom **map** (`MapScreen`, `MapView`, layout by dagre in `mapLayout.ts`), with an Outline view for reading. All data is in IndexedDB (Dexie); the user's OpenRouter key lives in the same store. `IDEA.md` is the product spec: read it before changing behavior.
 
 ## Architecture
 
@@ -40,7 +40,10 @@ Orchestration: `ai.ts` (ask / run / retry, tags, embeddings, concept search, fre
 - `reasoning_details` from a response are stored unmodified and replayed unmodified, only on turns made by the same model as the current request.
 - Mid-conversation effort changes (`configuration_update` system messages) are stored on the card and must keep their position on every replay; never two in a row. A 400 about them marks the model in `blockedConfigUpdate` and the request retries without them.
 - Only show settings the selected model supports; never hardcode model ids for the picker (families are matched by id pattern in `models.ts` from the live `/models` list).
-- Navigation is buttons only (no swipe gestures); keep tap targets at least 44px. Cards view is the only view.
+- The map uses pinch/drag plus buttons; elsewhere navigation is buttons only. Compact sizes: icon buttons 32–36px, chips 32px, breadcrumbs 28px (e2e checks nothing tappable is under 28px). Icons are monochrome inline SVG (`components/Icon.tsx`), not emoji.
+- The answer format section (`ANSWER_FORMAT` in `prompts.ts`) is appended to each new topic's frozen prompt; replay sends the stored JSON verbatim. v1 topics (prose answers, no format marker) still open: `cardAnswer()` converts paragraphs to a chain.
+- Search vectors are Int8 (cosine ignores scale); text-embedding-3 models are asked for 512 dimensions.
+- Storage: IndexedDB only (Dexie v2 adds bookmarks, stories, media). Nothing is deleted automatically; Settings › Storage lets the user pick files/topics. Backups are one zip (`backup.ts`, fflate) without the API key.
 - Synthesis runs in a module-level queue and its status is persisted; unfinished jobs resume on start (`resumePending`).
 
 ## Deployment

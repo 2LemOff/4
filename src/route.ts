@@ -1,7 +1,6 @@
 export type Route =
   | { name: "home" }
-  | { name: "card"; sid: string; cid: string; hl?: number }
-  | { name: "draft"; sid: string; cid: string; block?: number; sentence?: number }
+  | { name: "map"; sid: string; focus?: string; node?: string; hl?: number; view: "map" | "outline" }
   | { name: "library" }
   | { name: "outline"; id: string }
   | { name: "settings"; section: string };
@@ -10,16 +9,18 @@ export function parseRoute(hash: string): Route {
   const [pathPart, query = ""] = hash.replace(/^#/, "").split("?");
   const parts = pathPart.split("/").filter(Boolean).map(decodeURIComponent);
   const q = new URLSearchParams(query);
-  if (parts[0] === "s" && parts[2] === "c" && parts[1] && parts[3]) {
-    if (parts[4] === "d") {
-      if (parts[5] === "whole") return { name: "draft", sid: parts[1], cid: parts[3] };
-      const block = Number(parts[5]);
-      const sentence = Number(parts[6]);
-      if (Number.isInteger(block) && Number.isInteger(sentence)) return { name: "draft", sid: parts[1], cid: parts[3], block, sentence };
-      return { name: "draft", sid: parts[1], cid: parts[3] };
-    }
+  if (parts[0] === "s" && parts[1]) {
+    // v1 links: #/s/:sid/c/:cid[/d/...][?hl=n] open the map focused on that card
+    const focus = parts[2] === "c" && parts[3] ? parts[3] : q.get("focus") ?? undefined;
     const hl = q.get("hl");
-    return { name: "card", sid: parts[1], cid: parts[3], hl: hl !== null && hl !== "" ? Number(hl) : undefined };
+    return {
+      name: "map",
+      sid: parts[1],
+      focus,
+      node: q.get("node") ?? undefined,
+      hl: hl !== null && hl !== "" && !isNaN(Number(hl)) ? Number(hl) : undefined,
+      view: q.get("view") === "outline" ? "outline" : "map",
+    };
   }
   if (parts[0] === "library") return { name: "library" };
   if (parts[0] === "outline" && parts[1]) return { name: "outline", id: parts[1] };
@@ -27,10 +28,18 @@ export function parseRoute(hash: string): Route {
   return { name: "home" };
 }
 
+export function hrefMap(sid: string, opts: { focus?: string; node?: string; view?: "map" | "outline" } = {}): string {
+  const q = new URLSearchParams();
+  if (opts.focus) q.set("focus", opts.focus);
+  if (opts.node) q.set("node", opts.node);
+  if (opts.view === "outline") q.set("view", "outline");
+  const s = q.toString();
+  return `#/s/${sid}${s ? `?${s}` : ""}`;
+}
+
+/** Open the map focused on a question/answer (and optionally highlight its n-th point). */
 export const hrefCard = (sid: string, cid: string, hl?: number) =>
-  `#/s/${sid}/c/${cid}${hl !== undefined && hl >= 0 ? `?hl=${hl}` : ""}`;
-export const hrefDraft = (sid: string, cid: string, block?: number, sentence?: number) =>
-  block === undefined || sentence === undefined ? `#/s/${sid}/c/${cid}/d/whole` : `#/s/${sid}/c/${cid}/d/${block}/${sentence}`;
+  `#/s/${sid}?focus=${cid}${hl !== undefined && hl >= 0 ? `&hl=${hl}` : ""}`;
 
 export const go = (href: string) => {
   location.hash = href.replace(/^#/, "");

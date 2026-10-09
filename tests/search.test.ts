@@ -35,3 +35,16 @@ describe("keyword fallback", () => {
     expect(hitText(b, hit.blockIdx)).toBe("Entropy measures disorder.");
   });
 });
+
+import { quantize } from "../src/search";
+describe("quantize", () => {
+  it("keeps cosine ranking close to float32", () => {
+    const q = [0.12, -0.5, 0.33, 0.9, -0.01];
+    const docs = [[0.1, -0.4, 0.3, 0.8, 0], [0.9, 0.1, -0.2, 0.1, 0.4], [-0.1, 0.5, -0.3, -0.9, 0]];
+    const exact = docs.map((d) => cosine(q, d));
+    const approx = docs.map((d) => cosine(quantize(q), quantize(d)));
+    expect(approx.map((x, i) => Math.abs(x - exact[i]) < 0.02)).toEqual([true, true, true]);
+    expect(quantize([0, 0]).every((x) => x === 0)).toBe(true);
+    expect(quantize(new Array(512).fill(0.5)).byteLength).toBe(512);
+  });
+});

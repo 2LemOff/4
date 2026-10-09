@@ -3,7 +3,8 @@ import { modelInfo, settingsStore } from "./store";
 import { completeJSON } from "./openrouter";
 import { buildRequestParams } from "./modelRules";
 import { composeSynthesisPrompt, OUTLINE_SCHEMA, serializeTree } from "./prompts";
-import { settingsFor } from "./ai";
+import { cardAnswer, settingsFor } from "./ai";
+import { outlineText } from "./answer";
 import type { Card, Outline, OutlineSection, SynthesisSettings } from "./types";
 
 /** Start a background synthesis of a whole session. Returns the outline id immediately. */
@@ -71,7 +72,7 @@ export async function runOutline(outlineId: string): Promise<void> {
     const modelId = s.model || session.answerModel;
     const model = modelInfo(modelId);
     const categories = [...new Set((await db.outlines.toArray()).filter((o) => o.status === "done" && o.category).map((o) => o.category))];
-    const tree = serializeTree(cards.map((c) => ({ id: c.id, parentId: c.parentId, question: c.question, anchor: c.anchor, assistantText: c.assistant?.content })));
+    const tree = serializeTree(cards.map((c) => ({ id: c.id, parentId: c.parentId, question: c.question, anchor: c.anchor, assistantText: c.answer ? outlineText(cardAnswer(c)) : c.assistant?.content })));
     const params = buildRequestParams(s.modelSettings ?? settingsFor(modelId), model);
     params.max_tokens = Math.max(Number(params.max_tokens ?? 0), 16000);
 

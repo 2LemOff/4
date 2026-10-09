@@ -241,11 +241,14 @@ export async function completeText(opts: {
   return j.choices?.[0]?.message?.content ?? "";
 }
 
+/** Models that can return shortened vectors (Matryoshka); others are left at full size. */
+export const shortensEmbeddings = (model: string) => /text-embedding-3/.test(model);
+
 export async function embed(apiKey: string, model: string, input: string[]): Promise<number[][]> {
   const res = await fetch(`${API}/embeddings`, {
     method: "POST",
     headers: headers(apiKey),
-    body: JSON.stringify({ model, input }),
+    body: JSON.stringify({ model, input, ...(shortensEmbeddings(model) ? { dimensions: 512 } : {}) }),
   });
   if (!res.ok) throw await failure(res);
   const j = await res.json();

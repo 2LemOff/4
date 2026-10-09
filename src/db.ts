@@ -1,11 +1,14 @@
 import Dexie, { type Table } from "dexie";
-import type { Card, Outline, Session } from "./types";
+import type { Bookmark, Card, MediaRecord, Outline, Session } from "./types";
+import type { Story } from "./storyTypes";
+import { quantize } from "./search";
 
 export interface VectorRecord {
   cardId: string;
   blockIdx: number;
   model: string;
-  vector: Float32Array;
+  /** Int8 since v2 (cosine similarity ignores the scale); Float32 in v1 data */
+  vector: Int8Array | Float32Array;
 }
 
 export class FractalDB extends Dexie {
@@ -14,6 +17,9 @@ export class FractalDB extends Dexie {
   outlines!: Table<Outline, string>;
   vectors!: Table<VectorRecord, [string, number]>;
   kv!: Table<{ key: string; value: unknown }, string>;
+  bookmarks!: Table<Bookmark, string>;
+  stories!: Table<Story, string>;
+  media!: Table<MediaRecord, string>;
 
   constructor(name = "fractal") {
     super(name);
@@ -24,6 +30,20 @@ export class FractalDB extends Dexie {
       vectors: "[cardId+blockIdx],cardId",
       kv: "key",
     });
+    this.version(2)
+      .stores({
+        bookmarks: "id,sessionId,cardId,createdAt",
+        stories: "id,sessionId,cardId,createdAt",
+        media: "id,sessionId,storyId,kind,createdAt",
+      })
+      .upgrade((tx) =>
+        tx
+          .table("vectors")
+          .toCollection()
+          .modify((v: VectorRecord) => {
+            if (v.vector instanceof Float32Array) v.vector = quantize(v.vector);
+          }),
+      );
   }
 }
 

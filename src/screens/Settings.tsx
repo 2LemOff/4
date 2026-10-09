@@ -1,11 +1,12 @@
 import { useState } from "react";
+import { StorageSettings } from "./StorageSettings";
 import { db } from "../db";
 import { roleModel, settingsFor } from "../ai";
 import { ModelPicker } from "../components/ModelPicker";
 import { ModelSettingsEditor } from "../components/ModelSettingsEditor";
 import { SynthesisEditor } from "../components/SynthesisEditor";
 import { challengeS256, authUrl, makeVerifier } from "../openrouter";
-import { composeSystemPrompt, DEFAULT_SYSTEM_PROMPT, detectToggles, PROMPT_PARTS, setToggle } from "../prompts";
+import { ANSWER_FORMAT, composeSystemPrompt, DEFAULT_SYSTEM_PROMPT, detectToggles, PROMPT_PARTS, setToggle } from "../prompts";
 import { go } from "../route";
 import { modelsStore, refreshModels, settingsStore, updateSettings, useLive, useStore } from "../store";
 import type { PromptToggles } from "../types";
@@ -15,7 +16,7 @@ const SECTIONS = [
   ["models", "Models"],
   ["prompt", "System prompt"],
   ["synthesis", "Synthesis"],
-  ["data", "Data"],
+  ["storage", "Storage"],
 ] as const;
 
 export function Settings({ section }: { section: string }) {
@@ -33,7 +34,7 @@ export function Settings({ section }: { section: string }) {
       {section === "models" && <Models />}
       {section === "prompt" && <PromptSettings />}
       {section === "synthesis" && <SynthesisSettings />}
-      {section === "data" && <Data />}
+      {(section === "storage" || section === "data") && <StorageSettings />}
     </div>
   );
 }
@@ -110,7 +111,7 @@ function Models() {
 const TOGGLE_LABELS: Record<keyof PromptToggles, string> = {
   noWalls: "Directive 1: no walls of text, distinct premises",
   firstPrinciples: "Directive 2: first principles",
-  premiseFormat: "Premise formatting (short paragraphs, blank lines)",
+  premiseFormat: "Short premises: one claim each",
   pushback: "Honest pushback",
 };
 
@@ -127,10 +128,14 @@ function PromptSettings() {
           <span>{TOGGLE_LABELS[k]}</span>
         </label>
       ))}
-      {!toggles.premiseFormat && <p className="notice error small">Cards split answers on blank lines, so without the formatting rule blocks may be long.</p>}
       <textarea className="input" rows={14} value={systemPrompt} onChange={(e) => updateSettings({ systemPrompt: e.target.value })} aria-label="System prompt" />
       <button className="btn" onClick={() => updateSettings({ systemPrompt: DEFAULT_SYSTEM_PROMPT })}>Reset to default</button>
       <p className="muted small">Default: {composeSystemPrompt().length} characters.</p>
+      <details className="group">
+        <summary>Answer format (fixed, added after your prompt)</summary>
+        <p className="muted small">The app needs answers as pyramids, so this part can't be edited.</p>
+        <pre className="prompt-pre">{ANSWER_FORMAT}</pre>
+      </details>
     </section>
   );
 }
@@ -155,53 +160,6 @@ function SynthesisSettings() {
           <button className="btn chip" onClick={() => rename(c)}>Rename / merge</button>
         </div>
       )) : <p className="muted small">Categories appear after your first synthesis.</p>}
-    </section>
-  );
-}
-
-function Data() {
-  const [msg, setMsg] = useState("");
-  const exportAll = async () => {
-    const data = { app: "fractal", version: 1, sessions: await db.sessions.toArray(), cards: await db.cards.toArray(), outlines: await db.outlines.toArray() };
-    const url = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: "application/json" }));
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `fractal-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-  const importAll = async (file: File) => {
-    try {
-      const d = JSON.parse(await file.text());
-      if (d.app !== "fractal") throw new Error("Not a Fractal export.");
-      await db.sessions.bulkPut(d.sessions ?? []);
-      await db.cards.bulkPut(d.cards ?? []);
-      await db.outlines.bulkPut(d.outlines ?? []);
-      setMsg(`Imported ${d.sessions?.length ?? 0} sessions.`);
-    } catch (e) {
-      setMsg(e instanceof Error ? e.message : String(e));
-    }
-  };
-  return (
-    <section>
-      <h2 className="section">Your data</h2>
-      <p className="muted small">Everything is stored on this device. Exports don’t include your API key.</p>
-      <button className="btn" onClick={exportAll}>Export as JSON</button>
-      <label className="btn">
-        Import JSON
-        <input type="file" accept="application/json" hidden onChange={(e) => e.target.files?.[0] && importAll(e.target.files[0])} />
-      </label>
-      <button
-        className="btn danger"
-        onClick={async () => {
-          if (!confirm("Delete all sessions, cards and outlines on this device?")) return;
-          await Promise.all([db.sessions.clear(), db.cards.clear(), db.outlines.clear(), db.vectors.clear()]);
-          setMsg("All learning data deleted.");
-        }}
-      >
-        Delete all learning data
-      </button>
-      {msg && <p role="status" className="small">{msg}</p>}
     </section>
   );
 }

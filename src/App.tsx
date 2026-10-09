@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
 import { JobChip } from "./components/JobChip";
 import { parseRoute } from "./route";
-import { CardScreen } from "./screens/CardScreen";
-import { DraftScreen } from "./screens/DraftScreen";
 import { Home } from "./screens/Home";
 import { Library } from "./screens/Library";
+import { MapScreen } from "./screens/MapScreen";
 import { OutlineScreen } from "./screens/OutlineScreen";
 import { Settings } from "./screens/Settings";
 
@@ -22,8 +21,7 @@ export function App() {
     <div className="app">
       <div className="view">
         {r.name === "home" && <Home />}
-        {r.name === "card" && <CardScreen key={r.sid} sid={r.sid} cid={r.cid} hl={r.hl} />}
-        {r.name === "draft" && <DraftScreen key={`${r.cid}-${r.block}-${r.sentence}`} sid={r.sid} cid={r.cid} block={r.block} sentence={r.sentence} />}
+        {r.name === "map" && <MapScreen key={r.sid} sid={r.sid} focus={r.focus} node={r.node} hl={r.hl} view={r.view} />}
         {r.name === "library" && <Library />}
         {r.name === "outline" && <OutlineScreen id={r.id} />}
         {r.name === "settings" && <Settings section={r.section} />}

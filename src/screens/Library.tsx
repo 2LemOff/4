@@ -1,4 +1,5 @@
 import { db } from "../db";
+import { BookmarkList } from "../components/BookmarkList";
 import { go, hrefCard } from "../route";
 import { useLive } from "../store";
 import type { Outline } from "../types";
@@ -29,6 +30,7 @@ export function Library() {
     <div className="scroll pad">
       <h1>Library</h1>
       <p className="muted small">Concept outlines, grouped by subject.</p>
+      <BookmarkList />
 
       {byCategory.has("In progress") && (
         <>

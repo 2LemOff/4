@@ -74,8 +74,15 @@ export interface Usage {
 
 export interface Anchor {
   text: string;
-  blockIdx: number;
-  sentenceIdx: number;
+  /** map points the question is about (global ids like K7.n2) */
+  nodeIds?: string[];
+  /** quoted texts of the selected points */
+  quotes?: string[];
+  /** what was selected: some points, a whole pyramid, or a category */
+  scope?: "points" | "pyramid" | "category";
+  /** v1 sentence anchors (kept so old sessions replay unchanged) */
+  blockIdx?: number;
+  sentenceIdx?: number;
 }
 
 export type CardStatus = "streaming" | "done" | "error" | "refused" | "length";
@@ -90,7 +97,12 @@ export interface Card {
   configUpdate?: { effort: Effort };
   /** request-level effort actually in force for this card (root: the baseline sent on every replay) */
   effortUsed?: Effort;
+  /** v1: answer paragraphs. v2: the text of each answer node, in order (search and embeddings use this) */
   blocks: string[];
+  /** v2: per-session sequence number; node ids are prefixed K{seq} */
+  seq?: number;
+  /** v2: the answer as pyramids */
+  answer?: import("./answer").Answer;
   assistant?: AssistantMessage;
   model: string;
   modelSettings?: ModelSettings;
@@ -149,6 +161,30 @@ export interface SynthesisSettings {
   model: string;
   modelSettings?: ModelSettings;
   categoryMode: "reuse" | "free";
+}
+
+export interface Bookmark {
+  id: string;
+  sessionId: string;
+  cardId: string;
+  /** a single point on the map; absent = the whole question/answer */
+  nodeId?: string;
+  label: string;
+  createdAt: number;
+}
+
+export type MediaKind = "audio" | "image" | "video";
+
+export interface MediaRecord {
+  id: string;
+  sessionId: string;
+  storyId?: string;
+  kind: MediaKind;
+  mime: string;
+  size: number;
+  label: string;
+  blob: Blob;
+  createdAt: number;
 }
 
 export interface PromptToggles {
