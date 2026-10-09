@@ -21,6 +21,7 @@ import { SearchSheet } from "../components/SearchSheet";
 import { Sheet } from "../components/Sheet";
 import { SynthesisEditor } from "../components/SynthesisEditor";
 import { CouncilEditor } from "../components/CouncilEditor";
+import { StoryStartSheet } from "../components/StoryStartSheet";
 import { settingsStore } from "../store";
 import type { Anchor, Card } from "../types";
 
@@ -33,7 +34,7 @@ type Selection =
 
 const SIMILAR_MIN = 0.75;
 
-export function MapScreen({ sid, focus, node, hl, view }: { sid: string; focus?: string; node?: string; hl?: number; view: "map" | "outline" }) {
+export function MapScreen({ sid, focus, node, hl, view, quote }: { sid: string; focus?: string; node?: string; hl?: number; view: "map" | "outline"; quote?: string }) {
   const data = useLive(async () => {
     const cards = await db.cards.where("sessionId").equals(sid).toArray();
     return {
@@ -62,6 +63,9 @@ export function MapScreen({ sid, focus, node, hl, view }: { sid: string; focus?:
     }
   });
   const [councilSheet, setCouncilSheet] = useState(false);
+  const [storySheet, setStorySheet] = useState<{ cardId: string; pyramid?: { title: string; nodeIds: string[] } } | undefined>();
+  const [quoted, setQuoted] = useState(quote);
+  useEffect(() => setQuoted(quote), [quote]);
   const [forceModel, setForceModel] = useState<{ id: string; n: number } | undefined>();
   const setCouncil = (on: boolean) => {
     setCouncilOn(on);
@@ -226,6 +230,10 @@ export function MapScreen({ sid, focus, node, hl, view }: { sid: string; focus?:
     }
   } else if (sel.type === "question") {
     parentId = sel.cardId;
+  } else if (quoted) {
+    // a sentence tapped in a story about this answer
+    anchor = { text: quoted, quotes: [quoted], nodeIds: [], scope: "points" };
+    anchorLabel = `“${short(quoted, 60)}”`;
   }
 
   const fresh = async (cid = focusCard.id) => {
@@ -333,6 +341,11 @@ export function MapScreen({ sid, focus, node, hl, view }: { sid: string; focus?:
             onSelectNode={(id) => setSel({ type: "nodes", ids: [id] })}
             onAskPyramid={(p, c) => setSel({ type: "pyramid", cardId: c.id, pyramid: p })}
             onToggleSelectMode={() => setSelectMode((m) => !m)}
+            onStory={() => {
+              const { node: n, card: c } = panelNodes[0];
+              const p = pyramidOf(n.id);
+              setStorySheet({ cardId: c.id, pyramid: p && { title: p.title, nodeIds: p.nodeIds } });
+            }}
             onClose={() => (setSel({ type: "none" }), setSelectMode(false))}
           />
         )}
@@ -374,7 +387,7 @@ export function MapScreen({ sid, focus, node, hl, view }: { sid: string; focus?:
           parentId={parentId}
           anchor={anchor}
           anchorLabel={anchorLabel}
-          onClearAnchor={anchor ? () => (setSel({ type: "none" }), setSelectMode(false)) : undefined}
+          onClearAnchor={anchor ? () => (setSel({ type: "none" }), setSelectMode(false), setQuoted(undefined)) : undefined}
           placeholder={anchor ? "Your question about this…" : "Ask about this answer…"}
           defaultModel={idx.get(parentId)?.model ?? roleModel("answer")}
           inputRef={inputRef}
@@ -384,6 +397,7 @@ export function MapScreen({ sid, focus, node, hl, view }: { sid: string; focus?:
           forceModel={forceModel}
           onAsked={(r) => {
             setSel({ type: "none" });
+            setQuoted(undefined);
             setSelectMode(false);
             go(hrefCard(r.sessionId, r.cardId));
           }}
@@ -398,6 +412,9 @@ export function MapScreen({ sid, focus, node, hl, view }: { sid: string; focus?:
             onClick={() => toggleBookmark({ sessionId: sid, cardId: focusCard.id, label: focusCard.tag ?? focusCard.question }).then(() => setMenu(false))}
           >
             {bookmarkKeys.has(bookmarkKey(focusCard.id)) ? "Remove bookmark from this answer" : "Bookmark this answer"}
+          </button>
+          <button className="row-btn" onClick={() => (setStorySheet({ cardId: focusCard.id }), setMenu(false))}>
+            <span className="row-line"><Icon name="story" size={16} /> Learn as a story…</span>
           </button>
           <button className="row-btn" onClick={() => (setSynthOpen(true), setMenu(false))}>Synthesize with options…</button>
           <button
@@ -427,6 +444,7 @@ export function MapScreen({ sid, focus, node, hl, view }: { sid: string; focus?:
         </Sheet>
       )}
       {synthOpen && <SynthSheet sid={sid} model={session.answerModel} onClose={() => setSynthOpen(false)} onStarted={() => setToast("Synthesizing in the background. See Library.")} />}
+      {storySheet && <StoryStartSheet sessionId={sid} cardId={storySheet.cardId} pyramid={storySheet.pyramid} onClose={() => setStorySheet(undefined)} />}
       {searchOpen && <SearchSheet onClose={() => setSearchOpen(false)} />}
       {councilSheet && (
         <Sheet title="LLM Council" onClose={() => setCouncilSheet(false)}>

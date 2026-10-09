@@ -44,6 +44,9 @@ export const MODELS = [
     reasoning: { supported_efforts: ["xhigh", "high", "medium", "low", "none"], default_effort: "medium", default_enabled: true },
   },
 ];
+const SPEECH_MODELS = [{ id: "openai/gpt-4o-mini-tts", created: 2, architecture: { output_modalities: ["speech"] } }];
+/** A tiny SVG per scene, with a script and handler the app must strip. */
+export const SCENE_SVG = '<svg viewBox="0 0 400 300"><script>alert(1)</script><rect width="400" height="300" fill="#fde" onclick="x()"/><circle cx="200" cy="150" r="60" fill="#36c"/></svg>';
 const EMBED_MODELS = [{ id: "openai/text-embedding-3-small", created: 1, architecture: { output_modalities: ["embeddings"] } }];
 
 /** Deterministic character-trigram embedding so "observers" lands near "observer". */
@@ -70,6 +73,7 @@ export interface Calls {
   stream: any[];
   json: any[];
   embeddings: any[];
+  speech: any[];
 }
 
 /** A pyramid answer in the app's JSON format, using the id prefix the app sends. Later answers build on K1.n2. */
@@ -95,7 +99,7 @@ export function pyramidAnswer(prefix: string): string {
 const ANSWER = "Premise one is simple.\n\nPremise two depends on it. It has a second sentence about observers.\n\nPremise three concludes.";
 
 export async function mockOpenRouter(page: Page, opts: MockOptions = {}): Promise<Calls> {
-  const calls: Calls = { chat: [], stream: [], json: [], embeddings: [] };
+  const calls: Calls = { chat: [], stream: [], json: [], embeddings: [], speech: [] };
   let n = 0;
   await page.route(/https:\/\/openrouter\.ai\/api\/v1\/.*/, async (route: Route) => {
     const req = route.request();
@@ -104,12 +108,17 @@ export async function mockOpenRouter(page: Page, opts: MockOptions = {}): Promis
     const json = (data: unknown) => route.fulfill({ status: 200, headers: { ...CORS, "content-type": "application/json" }, body: JSON.stringify(data) });
 
     if (url.pathname.endsWith("/models")) {
-      return json({ data: url.searchParams.get("output_modalities") === "embeddings" ? EMBED_MODELS : MODELS });
+      const out = url.searchParams.get("output_modalities");
+      return json({ data: out === "embeddings" ? EMBED_MODELS : out === "speech" ? SPEECH_MODELS : out ? [] : MODELS });
     }
     if (url.pathname.endsWith("/embeddings")) {
       const body = req.postDataJSON();
       calls.embeddings.push(body);
       return json({ data: body.input.map((t: string, index: number) => ({ index, embedding: fakeEmbed(t) })) });
+    }
+    if (url.pathname.endsWith("/audio/speech")) {
+      calls.speech.push(req.postDataJSON());
+      return route.fulfill({ status: 200, headers: { ...CORS, "content-type": "audio/mpeg" }, body: Buffer.from([0xff, 0xf3, 0x44, 0xc4, 0, 0, 0, 0]) });
     }
     if (url.pathname.endsWith("/chat/completions")) {
       const body = req.postDataJSON();
@@ -159,6 +168,16 @@ export async function mockOpenRouter(page: Page, opts: MockOptions = {}): Promis
         const ids = [...userText.matchAll(/^\[(\w+)\]/gm)].map((m) => m[1]);
         return reply(JSON.stringify({ results: ids.slice(0, 2).map((id) => ({ id, why: "mentions observers" })) }));
       }
+      if (systemText.includes("narrated storyboard")) {
+        const style = systemText.includes("ScienceClic") ? "Grid" : "Mia";
+        return reply(JSON.stringify({
+          title: `${style} and the blue sky`,
+          scenario: "A walk at noon.",
+          slides: [1, 2, 3, 4].map((i) => ({ heading: `Scene ${i}`, narration: `${style} looks up in scene ${i}. The light scatters.`, visual: `A sky, scene ${i}.` })),
+        }));
+      }
+      if (systemText.startsWith("Draw the described scene")) return reply(SCENE_SVG);
+      if (userText.includes("Describe the visual style")) return reply("Bold flat shapes in teal and orange on cream, thick outlines.");
       if (systemText.includes("Summarize the conversation")) return reply("We established that premise one is simple and premise two depends on it.");
       if (systemText.includes("Respond with JSON only, matching: { title")) {
         const ids = [...userText.matchAll(/\[(\w{8})\]/g)].map((m) => m[1]);

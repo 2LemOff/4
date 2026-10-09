@@ -125,7 +125,7 @@ async function failure(res: Response): Promise<OpenRouterError> {
   return new OpenRouterError(msg, res.status);
 }
 
-export async function listModels(output: "text" | "embeddings" = "text"): Promise<ModelInfo[]> {
+export async function listModels(output: "text" | "embeddings" | "speech" | "video" = "text"): Promise<ModelInfo[]> {
   const url = output === "text" ? `${API}/models` : `${API}/models?output_modalities=${output}`;
   const res = await fetch(url);
   if (!res.ok) throw await failure(res);
@@ -255,6 +255,33 @@ export async function embed(apiKey: string, model: string, input: string[]): Pro
   return (j.data as { embedding: number[]; index: number }[])
     .sort((a, b) => a.index - b.index)
     .map((d) => d.embedding);
+}
+
+// ── Speech, vision ───────────────────────────────────────────────────────────
+
+/** Text to speech: POST /audio/speech returns raw audio bytes. */
+export async function speak(apiKey: string, opts: { model: string; input: string; voice: string; speed?: number }): Promise<Blob> {
+  const body: Record<string, unknown> = { model: opts.model, input: opts.input, voice: opts.voice, response_format: "mp3" };
+  if (opts.speed && opts.speed !== 1) body.speed = opts.speed;
+  const res = await fetch(`${API}/audio/speech`, { method: "POST", headers: headers(apiKey), body: JSON.stringify(body) });
+  if (!res.ok) throw await failure(res);
+  const blob = await res.blob();
+  return blob.type ? blob : new Blob([blob], { type: "audio/mpeg" });
+}
+
+/** Ask a vision-capable model about one or more images (data URLs). */
+export async function describeImages(apiKey: string, model: string, prompt: string, images: string[]): Promise<string> {
+  const res = await fetch(`${API}/chat/completions`, {
+    method: "POST",
+    headers: headers(apiKey),
+    body: JSON.stringify({
+      model,
+      max_tokens: 2000,
+      messages: [{ role: "user", content: [{ type: "text", text: prompt }, ...images.map((url) => ({ type: "image_url", image_url: { url } }))] }],
+    }),
+  });
+  if (!res.ok) throw await failure(res);
+  return (await res.json()).choices?.[0]?.message?.content ?? "";
 }
 
 // ── Sign-in (OAuth PKCE) ─────────────────────────────────────────────────────

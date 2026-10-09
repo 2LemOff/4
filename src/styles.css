@@ -259,3 +259,19 @@ input[type="range"] { width: 100%; accent-color: var(--accent); min-height: 32px
 .council summary, .member summary { cursor: pointer; min-height: 32px; display: flex; align-items: center; font-size: 0.9rem; }
 .member { margin: 4px 0; padding-left: 6px; border-left: 2px solid var(--line); }
 .council-note { margin: 4px 0 0; }
+
+/* Story player */
+.story { padding: 10px 14px 16px; }
+.story-pic { margin: 0; aspect-ratio: 4 / 3; border-radius: 14px; overflow: hidden; background: var(--surface2); display: grid; place-items: center; }
+.story-pic img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.story-pic img.kb { animation: kenburns 14s ease-in-out infinite alternate; transform-origin: 40% 40%; }
+.story-pic img.kb.paused { animation-play-state: paused; }
+@keyframes kenburns { from { transform: scale(1) translate(0, 0); } to { transform: scale(1.12) translate(-3%, -2%); } }
+@media (prefers-reduced-motion: reduce) { .story-pic img.kb { animation: none; } }
+.story-placeholder { padding: 16px; text-align: center; }
+.story-count { margin: 8px 0 2px; }
+.story-caption { margin: 4px 0; font-size: 1.05rem; line-height: 1.5; }
+.caption-line { display: block; width: 100%; border: none; border-radius: 8px; background: none; padding: 4px 6px; color: var(--text); font: inherit; text-align: left; cursor: pointer; min-height: 28px; }
+.caption-line:active { background: var(--surface2); }
+.dock.story-controls { flex-direction: row; align-items: center; }
+.btn.icon.primary { background: var(--accent); color: var(--accent-ink); }

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { StorageSettings } from "./StorageSettings";
+import { StorySettings } from "./StorySettings";
 import { db } from "../db";
 import { roleModel, settingsFor } from "../ai";
 import { ModelPicker } from "../components/ModelPicker";
@@ -18,6 +19,7 @@ const SECTIONS = [
   ["council", "Council"],
   ["prompt", "System prompt"],
   ["synthesis", "Synthesis"],
+  ["story", "Story"],
   ["storage", "Storage"],
 ] as const;
 
@@ -43,6 +45,7 @@ export function Settings({ section }: { section: string }) {
       )}
       {section === "prompt" && <PromptSettings />}
       {section === "synthesis" && <SynthesisSettings />}
+      {section === "story" && <StorySettings />}
       {(section === "storage" || section === "data") && <StorageSettings />}
     </div>
   );

@@ -6,6 +6,7 @@ import { Library } from "./screens/Library";
 import { MapScreen } from "./screens/MapScreen";
 import { OutlineScreen } from "./screens/OutlineScreen";
 import { Settings } from "./screens/Settings";
+import { StoryScreen } from "./screens/StoryScreen";
 
 export function App() {
   const [hash, setHash] = useState(location.hash);
@@ -21,7 +22,8 @@ export function App() {
     <div className="app">
       <div className="view">
         {r.name === "home" && <Home />}
-        {r.name === "map" && <MapScreen key={r.sid} sid={r.sid} focus={r.focus} node={r.node} hl={r.hl} view={r.view} />}
+        {r.name === "map" && <MapScreen key={r.sid} sid={r.sid} focus={r.focus} node={r.node} hl={r.hl} view={r.view} quote={r.quote} />}
+        {r.name === "story" && <StoryScreen key={r.id} id={r.id} />}
         {r.name === "library" && <Library />}
         {r.name === "outline" && <OutlineScreen id={r.id} />}
         {r.name === "settings" && <Settings section={r.section} />}

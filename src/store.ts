@@ -4,6 +4,7 @@ import { kvGet, kvSet } from "./db";
 import type { ModelInfo, ModelSettings, SynthesisSettings } from "./types";
 import { DEFAULT_SYNTHESIS, DEFAULT_SYSTEM_PROMPT, OLD_PREMISE_FORMAT, PROMPT_PARTS } from "./prompts";
 import { listModels } from "./openrouter";
+import { DEFAULT_STORY, type StorySettings } from "./storyStyles";
 
 type Listener = () => void;
 export function createStore<T>(initial: T) {
@@ -58,6 +59,7 @@ export interface AppSettings {
     verifier: string;
     removeUnsupported: boolean;
   };
+  story: StorySettings;
   lastBackupAt?: number;
   /** remind after this many days without a backup (0 = never) */
   backupReminderDays: number;
@@ -72,6 +74,7 @@ export const defaultAppSettings = (): AppSettings => ({
   blockedConfigUpdate: [],
   backupReminderDays: 7,
   council: { members: [], chairman: "", peerReview: true, verifier: "", removeUnsupported: true },
+  story: DEFAULT_STORY,
 });
 
 export const settingsStore = createStore<AppSettings>(defaultAppSettings());
@@ -87,6 +90,7 @@ export function updateSettings(patch: Partial<AppSettings> | ((s: AppSettings) =
 export interface ModelsState {
   models: ModelInfo[];
   embedModels: ModelInfo[];
+  speechModels?: ModelInfo[];
   loading: boolean;
   error?: string;
   fetchedAt?: number;
@@ -100,8 +104,12 @@ export async function refreshModels(force = false) {
   if (!force && cur.models.length && cur.fetchedAt && Date.now() - cur.fetchedAt < DAY) return;
   modelsStore.set({ ...cur, loading: true, error: undefined });
   try {
-    const [models, embedModels] = await Promise.all([listModels("text"), listModels("embeddings").catch(() => [])]);
-    const next = { models, embedModels, loading: false, fetchedAt: Date.now() };
+    const [models, embedModels, speechModels] = await Promise.all([
+      listModels("text"),
+      listModels("embeddings").catch(() => []),
+      listModels("speech").catch(() => []),
+    ]);
+    const next = { models, embedModels, speechModels, loading: false, fetchedAt: Date.now() };
     modelsStore.set(next);
     await kvSet("models", next);
   } catch (e) {
@@ -126,6 +134,7 @@ export async function initApp() {
   if (saved) {
     const merged = { ...defaultAppSettings(), ...saved };
     merged.council = { ...defaultAppSettings().council, ...saved.council };
+    merged.story = { ...DEFAULT_STORY, ...saved.story };
     // v1 prompts asked for blank-line paragraphs, which conflicts with the pyramid format
     merged.systemPrompt = merged.systemPrompt.replace(OLD_PREMISE_FORMAT, PROMPT_PARTS.premiseFormat);
     settingsStore.set(merged);
