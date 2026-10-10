@@ -29,6 +29,7 @@ The code splits into **pure, unit-tested modules** and **orchestration/UI** that
 
 Pure logic (`src/`, covered by `tests/`):
 - `tree.ts` builds the messages for a request by replaying the ancestor path **verbatim**. Every branch is append-only: a child's prefix is exactly its parent's messages plus the parent's answer. This keeps providers' signed reasoning valid and sibling branches cache-friendly. Do not edit, reorder or drop earlier turns.
+- `tasks.ts` lists every task that uses a model (group, kind, default model by family, editable prompt, the fixed format the app needs, length choices, base settings); `taskConfig.ts` resolves them (`taskModel`, `taskSetup` → model, prompt, request params). New model calls must go through a task, never a hardcoded model, prompt or max_tokens.
 - `modelRules.ts` + `reasoning.ts` turn a model's OpenRouter metadata (`supported_parameters`, the `reasoning` object) into the settings UI (`settingsControls`) and the request body (`buildRequestParams`). Per-family exceptions (Claude, Gemini, Grok, GPT-5.6+) live here.
 - `openrouter.ts` is the whole network layer (plain `fetch`) plus `applyChunk`, the SSE accumulator.
 - `prompts.ts` holds the hidden system prompt, synthesis presets and the JSON schema for outlines. `effort.ts` plans mid-conversation effort changes. `context.ts` is the token meter and fresh-branch card. `search.ts` is cosine/keyword search. `route.ts` is the hash router.

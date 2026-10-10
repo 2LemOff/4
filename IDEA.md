@@ -119,7 +119,23 @@ Edit it in **Settings › System prompt**, where each rule has a switch and you 
 
 ## Models and settings (OpenRouter)
 
-Fractal talks to [OpenRouter](https://openrouter.ai): Gemini Pro and Flash, Grok, the ChatGPT tiers, and Claude Opus, Fable and Sonnet. The model list is loaded live, and the answer model defaults to the newest Gemini Pro. The **⚙** button shows only the settings a model supports:
+Fractal talks to [OpenRouter](https://openrouter.ai): Gemini Pro and Flash, Grok, the ChatGPT tiers, and Claude Opus, Fable and Sonnet. The model list is loaded live.
+
+**Settings › Models lists every place a model is used**, grouped, and each opens the same editor:
+- **Chat:** answers, quick answers, quick check, claim check
+- **Council:** the chairman, peer review and the grounding check (members in Settings › Council)
+- **Views:** arranging for views, diagrams, drawing (plus the study doc in Settings › Synthesis)
+- **Photos:** text from images
+- **Search and memory:** reranking, the fresh-branch summary, embeddings
+- **Stories:** the story writer and the style-from-screenshots model (voice, images and video in Settings › Story)
+
+In each editor you choose:
+- the **model**; Automatic picks the newest suitable one, never a `:batch` or `:free` variant
+- the **prompt**; whatever the app must add to read the reply (a JSON format) is shown read-only
+- the **length**, in the task's own terms: sentences, words, claims or elements
+- **every setting that model supports**, saved per model
+
+The answers' editor also holds the hidden system prompt. The answer model defaults to the newest Gemini Pro and can be changed per question. The **⚙** button next to the question box shows only the settings a model supports:
 
 | Model | Extra settings and exceptions |
 |---|---|

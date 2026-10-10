@@ -1,20 +1,20 @@
 import { councilChairman, councilMembers } from "../council";
 import { modelsStore, settingsStore, updateSettings, useStore } from "../store";
-import { newestOf } from "../models";
+import { setTask, taskModel } from "../taskConfig";
 import { Icon } from "./Icon";
 import { ModelPicker, shortName } from "./ModelPicker";
 
 /** Chairman, members, peer review and grounding check. Changes apply from the next council question. */
 export function CouncilEditor() {
-  const { council } = useStore(settingsStore);
-  const { models } = useStore(modelsStore);
+  const { council, tasks } = useStore(settingsStore);
+  useStore(modelsStore);
   const members = councilMembers();
   const set = (patch: Partial<typeof council>) => updateSettings((s) => ({ council: { ...s.council, ...patch } }));
   return (
     <div className="settings-editor">
       <div className="field">
         <span className="field-label">Chairman (writes every council answer)</span>
-        <ModelPicker value={council.chairman || councilChairman()} onChange={(id) => set({ chairman: id })} label="Chairman" />
+        <ModelPicker value={tasks.chairman?.model || councilChairman()} onChange={(id) => setTask("chairman", { model: id || undefined })} label="Chairman" />
         <span className="muted small">Change it any time; the next council question uses the new chairman.</span>
       </div>
       <div className="field">
@@ -35,7 +35,8 @@ export function CouncilEditor() {
       </label>
       <div className="field">
         <span className="field-label">Grounding check model</span>
-        <ModelPicker value={council.verifier || newestOf(models, "gemini-flash")?.id || ""} onChange={(id) => set({ verifier: id })} label="Grounding check model" />
+        <ModelPicker value={tasks.verifier?.model || taskModel("verifier")} onChange={(id) => setTask("verifier", { model: id || undefined })} label="Grounding check model" />
+        <span className="muted small">Prompts, lengths and settings of the chairman, peer review and grounding check: Settings › Models.</span>
       </div>
       <label className="check">
         <input type="checkbox" checked={council.removeUnsupported} onChange={(e) => set({ removeUnsupported: e.target.checked })} />

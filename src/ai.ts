@@ -1,14 +1,14 @@
 import { db, uid } from "./db";
-import { modelInfo, settingsStore, streamStore, updateSettings, modelsStore } from "./store";
+import { modelInfo, settingsStore, streamStore, updateSettings } from "./store";
 import { completeJSON, completeText, embed, OpenRouterError, prepareMessages, streamChat } from "./openrouter";
 import { buildMessages, indexCards, pathToRoot, type ChatMessage } from "./tree";
-import { buildRequestParams, defaultSettings, resolveReasoning, settingsControls } from "./modelRules";
+import { buildRequestParams, resolveReasoning, settingsControls } from "./modelRules";
 import { canUseConfigUpdate, DEFAULT_MAX_TOKENS, reasoningExhausted } from "./reasoning";
 import { planEffort } from "./effort";
 import { splitBlocks } from "./blocks";
 import { makeFreshCard } from "./context";
-import { defaultEmbeddingModel, roleDefaults } from "./models";
-import { rerankPrompt, SEED_PROMPT, sessionPrompt, usesPyramids } from "./prompts";
+import { rerankPrompt, sessionPrompt, usesPyramids } from "./prompts";
+import { settingsFor, taskModel, taskSetup } from "./taskConfig";
 import { ANSWER_SCHEMA, answerTitle, parseAnswer, prefixFor, pruneCrossLinks, textAnswer, type Answer } from "./answer";
 import { hitText, keywordSearch, quantize, topCards } from "./search";
 import type { Anchor, Card, ModelSettings, Session } from "./types";
@@ -25,16 +25,11 @@ export function cardAnswer(c: Card): Answer | undefined {
   return text.trim() ? textAnswer(text, cardPrefix(c)) : undefined;
 }
 
-export function settingsFor(modelId: string): ModelSettings {
-  return settingsStore.get().modelSettings[modelId] ?? defaultSettings(modelInfo(modelId));
-}
+export { settingsFor };
 
+/** The model of a role (kept for older call sites; every role is a task now). */
 export function roleModel(role: "answer" | "tags" | "rerank" | "embed"): string | undefined {
-  const chosen = settingsStore.get().roleModels[role];
-  if (chosen) return chosen;
-  const { models, embedModels } = modelsStore.get();
-  if (role === "embed") return defaultEmbeddingModel(embedModels);
-  return roleDefaults(models)[role];
+  return taskModel(role === "tags" ? "summary" : role) || undefined;
 }
 
 export interface AskOptions {
@@ -256,24 +251,23 @@ export async function searchConcepts(query: string): Promise<SearchOutcome> {
     const hits = topCards(qv, all, 20);
     if (!hits.length) return keyword();
 
-    const rerankId = roleModel("rerank");
-    if (rerankId && hits.length > 1) {
+    const rr = taskSetup("rerank");
+    if (rr.model && hits.length > 1) {
       try {
         const cands = hits.flatMap((h) => {
           const c = byId.get(h.cardId);
           return c ? [{ id: c.id, tag: c.tag ?? "", text: hitText(c, h.blockIdx).slice(0, 240) }] : [];
         });
-        const m = modelInfo(rerankId);
         const { data } = await completeJSON<{ results: { id: string; why?: string }[] }>({
           apiKey: apiKey(),
-          model: m,
-          messages: [{ role: "user", content: rerankPrompt(query, cands) }],
+          model: rr.info,
+          messages: [{ role: "user", content: rerankPrompt(query, cands, rr.prompt) }],
           schemaName: "rerank",
           schema: {
             type: "object", additionalProperties: false, required: ["results"],
             properties: { results: { type: "array", items: { type: "object", additionalProperties: false, required: ["id", "why"], properties: { id: { type: "string" }, why: { type: "string" } } } } },
           },
-          extra: buildRequestParams({ reasoning: { effort: "low" }, max_tokens: 4000 }, m),
+          extra: rr.params,
         });
         const why = new Map(data.results.map((r) => [r.id, r.why ?? ""]));
         const order = data.results.map((r) => hits.find((h) => h.cardId === r.id)).filter((h): h is NonNullable<typeof h> => !!h);
@@ -297,13 +291,13 @@ export async function startFreshBranch(fromCardId: string): Promise<string> {
   const transcript = path
     .map((c) => `Q: ${c.anchor ? `(on “${c.anchor.text}”) ` : ""}${c.question}\nA: ${c.assistant?.content ?? ""}`)
     .join("\n\n");
-  const id = roleModel("tags");
-  if (!id || !apiKey()) throw new Error("Connect OpenRouter first.");
+  const t = taskSetup("summary");
+  if (!t.model || !apiKey()) throw new Error("Connect OpenRouter first.");
   const summary = await completeText({
     apiKey: apiKey(),
-    model: modelInfo(id),
-    messages: [{ role: "system", content: SEED_PROMPT }, { role: "user", content: transcript }],
-    extra: buildRequestParams({ reasoning: { effort: "low" }, max_tokens: 3000 }, modelInfo(id)),
+    model: t.info,
+    messages: [{ role: "system", content: t.prompt }, { role: "user", content: transcript }],
+    extra: t.params,
   });
   if (!summary.trim()) throw new Error("Could not summarize this branch.");
   const fresh = makeFreshCard(from, summary.trim(), uid(), Date.now());

@@ -176,18 +176,15 @@ Grounding rules (strict):
 - If something the learner needs is not covered by the council, add a node saying "Not covered by the council: …" instead of filling it in.
 - Weigh the peer rankings when choosing between conflicting claims.`;
 
-export const VERIFIER_PROMPT = `You check grounding. For each chairman point, decide whether it is supported by the council responses (stated or directly implied there). Do not use outside knowledge: a true statement that isn't in the responses is NOT supported. Reply with JSON only: {"results":[{"id":"…","supported":true|false,"quote":"short supporting quote or empty"}]}.`;
-
-export function reviewPrompt(question: string, responses: string): string {
-  return `You are evaluating different responses to the following question:\n\n${question}\n\nHere are the responses from different models (anonymized):\n\n${responses}\n\nYour task:\n1. Evaluate each response individually: what it does well and what it does poorly, focusing on accuracy and insight.\n2. Then rank them from best to worst.\n\nReply with JSON only: {"evaluation":"…","ranking":["Response C","Response A",…]}. If you cannot reply in JSON, end with a section "FINAL RANKING:" listing "1. Response X" lines.`;
+/** `task`: the review instructions (Settings › Models › Peer review), including the JSON format. */
+export function reviewPrompt(question: string, responses: string, task: string): string {
+  return `You are evaluating different responses to the following question:\n\n${question}\n\nHere are the responses from different models (anonymized):\n\n${responses}\n\nYour task:\n${task}\n\nIf you cannot reply in JSON, end with a section "FINAL RANKING:" listing "1. Response X" lines.`;
 }
 
-export const SEED_PROMPT =
-  "Summarize the conversation below in under 150 words so it can be continued in a fresh thread. Keep the definitions and conclusions reached. Reply with plain text only.";
-
-export function rerankPrompt(query: string, candidates: { id: string; tag: string; text: string }[]): string {
+/** `task`: the reranking instructions (Settings › Models › Search reranking), including the JSON format. */
+export function rerankPrompt(query: string, candidates: { id: string; tag: string; text: string }[], task: string): string {
   const list = candidates.map((c) => `[${c.id}] (${c.tag}) ${c.text}`).join("\n");
-  return `The learner is searching their notes: "${query}"\n\nCandidates:\n${list}\n\nPick the candidates that best match the concept, best first, at most 5. Reply with JSON only: {"results":[{"id":"...","why":"one short line"}]}.`;
+  return `The learner is searching their notes: "${query}"\n\nCandidates:\n${list}\n\n${task}`;
 }
 
 export function serializeTree(

@@ -3,6 +3,7 @@ import { Sheet } from "./Sheet";
 import { modelsStore, useStore } from "../store";
 import { familyModels, PICKER_FAMILIES, priceLabel, type PickerFamily } from "../models";
 import { formatTokens } from "../context";
+import type { ModelInfo } from "../types";
 
 export const shortName = (id: string) => id.replace(/^~/, "").split("/").slice(1).join("/") || id;
 
@@ -12,6 +13,7 @@ export function ModelPicker({
   label = "Model",
   allowEmpty,
   emptyLabel,
+  filter,
 }: {
   value: string;
   onChange: (id: string) => void;
@@ -19,8 +21,12 @@ export function ModelPicker({
   /** offer a "same as …" choice that selects the empty string */
   allowEmpty?: boolean;
   emptyLabel?: string;
+  /** only models that can do the job (e.g. read images) */
+  filter?: (m: ModelInfo) => boolean;
 }) {
-  const { models, loading, error } = useStore(modelsStore);
+  const store = useStore(modelsStore);
+  const { loading, error } = store;
+  const models = useMemo(() => (filter ? store.models.filter(filter) : store.models), [store.models, filter]);
   const [open, setOpen] = useState(false);
   const [family, setFamily] = useState<PickerFamily | "all">("gemini-pro");
   const [q, setQ] = useState("");

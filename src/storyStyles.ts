@@ -1,4 +1,5 @@
 import type { StorySlide } from "./storyTypes";
+import { TASK, taskPrompt } from "./tasks";
 
 export type StyleId = "ted-ed" | "scienceclic" | "custom";
 
@@ -110,10 +111,12 @@ export function storyPrompt(s: StorySettings, styleId: StyleId = s.style): strin
     .join("\n\n");
 }
 
-/** System prompt for drawing one scene as SVG shapes. */
+/** The picture look, added to the drawing task's instructions. */
+export const lookLine = (s: StorySettings) => `Look: ${lookText(s) || LOOKS.flat.description}.`;
+
+/** The default system prompt for drawing one scene as SVG shapes (the drawing task's prompt with the look). */
 export function drawPrompt(s: StorySettings): string {
-  return `Draw the described scene as a single SVG illustration. Look: ${lookText(s) || LOOKS.flat.description}.
-Rules: viewBox="0 0 400 300"; flat shapes, paths and gradients only; no text, no <image>, no scripts, no external links; at most 5000 characters. Reply with the <svg> element only.`;
+  return taskPrompt(TASK.sketch, undefined, lookLine(s));
 }
 
 export const STORY_SCHEMA = {

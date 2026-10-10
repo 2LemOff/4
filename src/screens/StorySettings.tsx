@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { drawModel, previewVoice, styleFromScreenshots, visionModel, voiceModel, voiceName, voicesFor } from "../stories";
 import { LOOKS, STORY_STYLES, type LookId, type StorySettings as Cfg, type StyleId } from "../storyStyles";
 import { modelsStore, refreshModels, settingsStore, updateSettings, useStore } from "../store";
+import { setTask } from "../taskConfig";
 import { ModelPicker } from "../components/ModelPicker";
 import { MediaControls } from "../components/MediaControls";
 import { imageSetup, loadEndpoints, loadMediaModels, mediaStore, videoSetup } from "../media";
@@ -19,7 +20,7 @@ async function toDataUrl(file: File): Promise<string> {
 }
 
 export function StorySettings() {
-  const { story: s } = useStore(settingsStore);
+  const { story: s, tasks } = useStore(settingsStore);
   const models = useStore(modelsStore);
   const speechModels = (models.speechModels ?? []).filter((m) => !m.id.includes(":"));
   const vModel = voiceModel();
@@ -129,11 +130,12 @@ export function StorySettings() {
       )}
       <div className="field">
         <span className="field-label">Drawing model</span>
-        <ModelPicker value={s.drawModel} onChange={(id) => set({ drawModel: id })} label="Drawing model" allowEmpty emptyLabel={`Automatic (${drawModel().split("/").pop()})`} />
+        <ModelPicker value={tasks.sketch?.model ?? ""} onChange={(id) => setTask("sketch", { model: id || undefined })} label="Drawing model" allowEmpty emptyLabel={`Automatic (${drawModel().split("/").pop()})`} />
       </div>
       <div className="field">
         <span className="field-label">Story writer</span>
-        <ModelPicker value={s.storyModel} onChange={(id) => set({ storyModel: id })} label="Story writer" allowEmpty emptyLabel="Same as the topic's model" />
+        <ModelPicker value={tasks.storyWriter?.model ?? ""} onChange={(id) => setTask("storyWriter", { model: id || undefined })} label="Story writer" allowEmpty emptyLabel="Same as the topic's model" />
+        <span className="muted small">Prompts and settings of the drawing, story and screenshot models: Settings › Models.</span>
       </div>
       <div className="field">
         <span className="field-label">Slides per story</span>

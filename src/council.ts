@@ -3,11 +3,13 @@ import { modelInfo, settingsStore, streamStore, modelsStore } from "./store";
 import { completeJSON, completeText, prepareMessages, streamChat } from "./openrouter";
 import { buildMessages, indexCards, type ChatMessage } from "./tree";
 import { buildRequestParams, settingsControls } from "./modelRules";
-import { cardPrefix, embedCards, roleModel, settingsFor } from "./ai";
+import { cardPrefix, embedCards, settingsFor } from "./ai";
+import { taskModel, taskSetup } from "./taskConfig";
+import { lengthOf, TASK } from "./tasks";
 import { ANSWER_SCHEMA, answerTitle, outlineText, parseAnswer, pruneCrossLinks, type Answer } from "./answer";
 import { aggregateRankings, applyGrounding, LABELS, labelOf, parseRanking, type Verdict } from "./councilLogic";
-import { councilDefaults, newestOf } from "./models";
-import { CHAIRMAN_RULES, reviewPrompt, VERIFIER_PROMPT } from "./prompts";
+import { councilDefaults } from "./models";
+import { CHAIRMAN_RULES, reviewPrompt } from "./prompts";
 import type { Card, CouncilData, CouncilMember, ModelSettings } from "./types";
 
 export function councilMembers(): string[] {
@@ -15,10 +17,7 @@ export function councilMembers(): string[] {
   return s.members.length ? s.members : councilDefaults(modelsStore.get().models);
 }
 export function councilChairman(): string {
-  return settingsStore.get().council.chairman || roleModel("answer") || "";
-}
-function verifierModel(): string {
-  return settingsStore.get().council.verifier || newestOf(modelsStore.get().models, "gemini-flash")?.id || roleModel("tags") || councilChairman();
+  return taskModel("chairman");
 }
 
 /** Chairman reasons whenever the model allows it. */
@@ -119,7 +118,7 @@ export async function runCouncil(cardId: string): Promise<void> {
     council.reviews = await Promise.all(
       answered.map(async (m) => {
         const model = modelInfo(m.model);
-        const prompt = reviewPrompt(question, responses);
+        const prompt = reviewPrompt(question, responses, taskSetup("review").prompt);
         try {
           const { data } = await completeJSON<{ evaluation: string; ranking: string[] }>({
             apiKey,
@@ -130,7 +129,7 @@ export async function runCouncil(cardId: string): Promise<void> {
               type: "object", additionalProperties: false, required: ["evaluation", "ranking"],
               properties: { evaluation: { type: "string" }, ranking: { type: "array", items: { type: "string" } } },
             },
-            extra: buildRequestParams({ ...settingsFor(m.model), max_tokens: 8000 }, model),
+            extra: buildRequestParams({ ...settingsFor(m.model), max_tokens: lengthOf(TASK.review, settingsStore.get().tasks.review)?.maxTokens ?? 8000 }, model),
           });
           return { model: m.model, label: m.label, evaluation: String(data.evaluation ?? ""), ranking: (data.ranking ?? []).map(labelOf) };
         } catch {
@@ -188,16 +187,16 @@ export async function runCouncil(cardId: string): Promise<void> {
 
   // 4. grounding check
   council.stage = "checking";
-  council.verifier = verifierModel();
+  const vt = taskSetup("verifier");
+  council.verifier = vt.model;
   await save(cardId, { ...council });
   let verdicts: Verdict[] = [];
   try {
-    const vm = modelInfo(council.verifier);
     const { data } = await completeJSON<{ results: Verdict[] }>({
       apiKey,
-      model: vm,
+      model: vt.info,
       messages: [
-        { role: "system", content: VERIFIER_PROMPT },
+        { role: "system", content: vt.prompt },
         { role: "user", content: `COUNCIL RESPONSES:\n${responses}\n\nCHAIRMAN POINTS:\n${final.nodes.map((n) => `[${n.id}] ${n.text}`).join("\n")}` },
       ],
       schemaName: "grounding",
@@ -205,7 +204,7 @@ export async function runCouncil(cardId: string): Promise<void> {
         type: "object", additionalProperties: false, required: ["results"],
         properties: { results: { type: "array", items: { type: "object", additionalProperties: false, required: ["id", "supported", "quote"], properties: { id: { type: "string" }, supported: { type: "boolean" }, quote: { type: "string" } } } } },
       },
-      extra: buildRequestParams({ reasoning: { effort: "low" }, max_tokens: 6000 }, vm),
+      extra: vt.params,
     });
     verdicts = data.results ?? [];
   } catch {

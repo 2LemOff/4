@@ -2,10 +2,9 @@ import { useState } from "react";
 import { StorageSettings } from "./StorageSettings";
 import { StorySettings } from "./StorySettings";
 import { db } from "../db";
-import { roleModel, settingsFor } from "../ai";
-import { ModelPicker } from "../components/ModelPicker";
-import { ModelSettingsEditor } from "../components/ModelSettingsEditor";
+import { roleModel } from "../ai";
 import { SynthesisEditor } from "../components/SynthesisEditor";
+import { TaskList } from "../components/TaskEditor";
 import { CouncilEditor } from "../components/CouncilEditor";
 import { challengeS256, authUrl, makeVerifier } from "../openrouter";
 import { ANSWER_FORMAT, composeSystemPrompt, DEFAULT_SYSTEM_PROMPT, detectToggles, PROMPT_PARTS, setToggle } from "../prompts";
@@ -83,39 +82,30 @@ function Account() {
 }
 
 function Models() {
-  const s = useStore(settingsStore);
   const m = useStore(modelsStore);
-  const answer = roleModel("answer") ?? "";
-  const role = (key: "answer" | "tags" | "rerank", label: string, hint: string) => (
-    <div className="field">
-      <span className="field-label">{label}</span>
-      <ModelPicker value={s.roleModels[key] ?? roleModel(key) ?? ""} onChange={(id) => updateSettings({ roleModels: { ...s.roleModels, [key]: id } })} label={label} />
+  const row = (label: string, hint: string, href: string) => (
+    <button className="row-btn compact task-row" onClick={() => go(href)}>
+      <strong>{label}</strong>
       <span className="muted small">{hint}</span>
-    </div>
+    </button>
   );
   return (
     <section>
-      <h2 className="section">Model per role</h2>
-      {role("answer", "Answers", "Newest Gemini Pro by default. Can be changed per question.")}
-      {role("tags", "Summaries", "Used for fresh-branch summaries. Newest Gemini Flash by default.")}
-      {role("rerank", "Search reranking", "Newest Claude Sonnet by default.")}
-      <label className="field">
-        <span className="field-label">Embeddings (search)</span>
-        <select className="input" value={s.roleModels.embed ?? ""} onChange={(e) => updateSettings({ roleModels: { ...s.roleModels, embed: e.target.value || undefined } })}>
-          <option value="">Automatic ({roleModel("embed") ?? "none available"})</option>
-          {m.embedModels.map((x) => <option key={x.id} value={x.id}>{x.id}</option>)}
-        </select>
-      </label>
+      <p className="muted small">
+        Every place Fractal uses a model. Tap one to choose its model, prompt, length and every setting that model supports.
+      </p>
       <p className="muted small">
         {m.models.length ? `${m.models.length} models loaded.` : "No models loaded."} {m.error && <span className="error">{m.error}</span>}{" "}
         <button className="btn chip" onClick={() => refreshModels(true)} disabled={m.loading}>{m.loading ? "Loading…" : "Refresh list"}</button>
       </p>
-      {answer && (
-        <>
-          <h2 className="section">Default settings for {answer.split("/").pop()}</h2>
-          <ModelSettingsEditor modelId={answer} value={settingsFor(answer)} onChange={(v) => updateSettings({ modelSettings: { ...s.modelSettings, [answer]: v } })} />
-        </>
-      )}
+      <TaskList
+        answerExtra={<PromptSettings embedded />}
+        extraRows={{
+          Council: row("Members", "Who answers in the council (Settings › Council)", "#/settings/council"),
+          Views: row("Study doc (synthesis)", "Style, prompt, length, language and model", "#/settings/synthesis"),
+          Stories: row("Voice, AI images and AI video", "Their models, voices and settings (Settings › Story)", "#/settings/story"),
+        }}
+      />
     </section>
   );
 }
@@ -125,12 +115,12 @@ const TOGGLE_LABELS: Record<keyof PromptToggles, string> = {
   pushback: "Honest pushback when challenged",
 };
 
-function PromptSettings() {
+function PromptSettings({ embedded }: { embedded?: boolean }) {
   const { systemPrompt, answerFormat } = useStore(settingsStore);
   const toggles = detectToggles(systemPrompt);
   return (
     <section>
-      <h2 className="section">Hidden system prompt</h2>
+      <h2 className="section">{embedded ? "Prompt (the hidden system prompt)" : "Hidden system prompt"}</h2>
       <p className="muted small">Sent with every question. Changes apply to <strong>new topics</strong>; each topic keeps the prompt it started with.</p>
       {(Object.keys(PROMPT_PARTS) as (keyof PromptToggles)[]).map((k) => (
         <label key={k} className="check">

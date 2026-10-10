@@ -1,12 +1,11 @@
 import { db, uid } from "./db";
-import { modelInfo, modelsStore, settingsStore, updateSettings } from "./store";
+import { modelsStore, settingsStore, updateSettings } from "./store";
 import { completeJSON, completeText, describeImages, OpenRouterError, speak } from "./openrouter";
-import { buildRequestParams } from "./modelRules";
-import { cardAnswer, roleModel, settingsFor } from "./ai";
+import { cardAnswer } from "./ai";
 import { outlineText, subsetOutline } from "./answer";
-import { newestOf } from "./models";
 import { indexCards, pathToRoot } from "./tree";
-import { drawPrompt, normalizeStory, sanitizeSvg, STORY_SCHEMA, storyPrompt, type StyleId } from "./storyStyles";
+import { lookLine, normalizeStory, sanitizeSvg, STORY_SCHEMA, storyPrompt, type StyleId } from "./storyStyles";
+import { taskModel, taskSetup } from "./taskConfig";
 import type { Story, StoryScope, StorySlide } from "./storyTypes";
 import type { Card } from "./types";
 import { imageSlide, patchSlide, resumeVideos } from "./media";
@@ -14,9 +13,7 @@ import { imageSlide, patchSlide, resumeVideos } from "./media";
 const key = () => settingsStore.get().apiKey;
 const cfg = () => settingsStore.get().story;
 
-export function drawModel(): string {
-  return cfg().drawModel || newestOf(modelsStore.get().models, "claude-sonnet")?.id || roleModel("answer") || "";
-}
+export const drawModel = () => taskModel("sketch");
 export function voiceModel(): string {
   const list = (modelsStore.get().speechModels ?? []).filter((m) => !m.id.includes(":"));
   return cfg().voiceModel || list.find((m) => /gpt-4o-mini-tts/.test(m.id))?.id || [...list].sort((a, b) => (b.created ?? 0) - (a.created ?? 0))[0]?.id || "";
@@ -47,11 +44,7 @@ async function narrate(input: string): Promise<Blob> {
     return speak(key(), { ...opts, speed: undefined });
   }
 }
-export function visionModel(): string {
-  const ms = modelsStore.get().models.filter((m) => (m.architecture as { input_modalities?: string[] } | undefined)?.input_modalities?.includes("image"));
-  const pref = cfg().storyModel || roleModel("answer") || "";
-  return ms.find((m) => m.id === pref)?.id ?? ms.sort((a, b) => (b.created ?? 0) - (a.created ?? 0))[0]?.id ?? pref;
-}
+export const visionModel = () => taskModel("styleVision");
 
 /** An answer as text for a story: full-text answers as written, pyramid answers as an outline. */
 const answerText = (c: Card) => (c.answer && !c.answer.converted ? outlineText(c.answer) : c.assistant?.content || outlineText(cardAnswer(c)));
@@ -103,18 +96,17 @@ export async function runStory(id: string): Promise<void> {
     if (!story.slides.length) {
       await db.stories.update(id, { status: "running", error: undefined });
       const session = await db.sessions.get(story.sessionId);
-      const modelId = cfg().storyModel || session?.answerModel || roleModel("answer") || "";
-      const model = modelInfo(modelId);
+      const writer = taskSetup("storyWriter", { answerModel: session?.answerModel });
       const { data } = await completeJSON<unknown>({
         apiKey: key(),
-        model,
+        model: writer.info,
         messages: [
           { role: "system", content: storyPrompt({ ...cfg(), style: story.style as StyleId }, story.style as StyleId) },
           { role: "user", content: await material(story) },
         ],
         schemaName: "storyboard",
         schema: STORY_SCHEMA,
-        extra: buildRequestParams({ ...settingsFor(modelId), max_tokens: 12000 }, model),
+        extra: writer.params,
       });
       const s = normalizeStory(data, cfg().slides);
       const slides: StorySlide[] = s.slides.map((x) => ({ ...x, picture: cfg().picture, pictureStatus: "pending", audioStatus: "pending" }));
@@ -140,15 +132,15 @@ export async function drawSlide(id: string, i: number, force = false): Promise<v
   if (!st || !slide || (!force && (slide.picture !== "shapes" || (slide.pictureStatus === "done" && slide.svg)))) return;
   await patchSlide(id, i, { picture: "shapes", pictureStatus: "running", pictureError: undefined });
   try {
-    const m = modelInfo(drawModel());
+    const t = taskSetup("sketch", { middle: lookLine(cfg()) });
     const text = await completeText({
       apiKey: key(),
-      model: m,
+      model: t.info,
       messages: [
-        { role: "system", content: drawPrompt(cfg()) },
+        { role: "system", content: t.prompt },
         { role: "user", content: `Scene: ${slide.visual}\nIt illustrates: ${slide.narration}` },
       ],
-      extra: buildRequestParams({ reasoning: { effort: "low" }, max_tokens: 8000 }, m),
+      extra: t.params,
     });
     const svg = sanitizeSvg(text);
     if (!svg) throw new Error("The drawing model didn't return a usable SVG.");
@@ -185,12 +177,8 @@ export async function previewVoice(text = "This is how your stories will sound."
 
 /** Turn reference screenshots into a reusable written style description. */
 export async function styleFromScreenshots(dataUrls: string[]): Promise<string> {
-  const text = await describeImages(
-    key(),
-    visionModel(),
-    "Describe the visual style of these images so an illustrator could reproduce it: palette, line weight, shapes, textures, background, composition and mood. One short paragraph, no mention of the subject matter.",
-    dataUrls,
-  );
+  const t = taskSetup("styleVision");
+  const text = await describeImages(key(), t.model, t.prompt, dataUrls);
   if (!text.trim()) throw new Error("No description came back.");
   return text.trim();
 }

@@ -5,6 +5,7 @@ import type { ModelInfo, ModelSettings, SynthesisSettings } from "./types";
 import { DEFAULT_SYNTHESIS, DEFAULT_SYSTEM_PROMPT, migrateSystemPrompt, type AnswerFormat } from "./prompts";
 import { listModels } from "./openrouter";
 import { DEFAULT_STORY, type StorySettings } from "./storyStyles";
+import { migrateTasks, type TaskMap } from "./tasks";
 
 type Listener = () => void;
 export function createStore<T>(initial: T) {
@@ -41,7 +42,10 @@ export function useLive<T>(fn: () => Promise<T> | T, deps: unknown[]): T | undef
 
 export interface AppSettings {
   apiKey: string;
+  /** before v3: model per role (moved into `tasks`) */
   roleModels: { answer?: string; tags?: string; rerank?: string; embed?: string };
+  /** model, prompt, length and settings of every task that uses a model */
+  tasks: TaskMap;
   /** saved settings per model id */
   modelSettings: Record<string, ModelSettings>;
   /** hidden system prompt used for NEW sessions (each session keeps its own frozen copy) */
@@ -70,6 +74,7 @@ export interface AppSettings {
 export const defaultAppSettings = (): AppSettings => ({
   apiKey: "",
   roleModels: {},
+  tasks: {},
   modelSettings: {},
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
   answerFormat: "text",
@@ -141,6 +146,8 @@ export async function initApp() {
     merged.story = { ...DEFAULT_STORY, ...saved.story };
     // older default prompts had more rules; only the current two are kept (plus anything the user wrote)
     merged.systemPrompt = migrateSystemPrompt(merged.systemPrompt);
+    // model choices from before tasks existed move into the task list once
+    merged.tasks = migrateTasks(saved);
     settingsStore.set(merged);
   }
   const cached = await kvGet<ModelsState>("models");
