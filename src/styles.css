@@ -329,9 +329,17 @@ mark.hl[data-n]::after { content: attr(data-n); display: inline-block; white-spa
 .answer-foot { display: flex; align-items: center; gap: 0; color: var(--muted); }
 .answer-foot .btn.icon.sm { border: none; background: transparent; color: var(--muted); }
 .chat-dock { gap: 4px; padding: 4px 8px calc(4px + env(safe-area-inset-bottom)); }
-.selbar { display: flex; align-items: center; gap: 6px; overflow-x: auto; scrollbar-width: none; }
-.tray { display: flex; align-items: center; gap: 4px; overflow-x: auto; scrollbar-width: none; }
-.tray-items, .tray-actions { display: flex; align-items: center; gap: 4px; flex: none; }
+.selbar { display: flex; align-items: center; justify-content: space-between; gap: 2px; }
+.toolbtn {
+  flex: 1 1 0; min-width: 40px; max-width: 64px; min-height: 40px; padding: 2px 0;
+  display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  border: none; border-radius: 10px; background: transparent; color: var(--text); font: inherit; cursor: pointer;
+}
+.toolbtn span { font-size: 0.66rem; line-height: 1.1; white-space: nowrap; }
+.toolbtn:active { background: var(--surface2); }
+.tray { display: flex; flex-direction: column; gap: 2px; }
+.tray-items { display: flex; align-items: center; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+.tray-actions { display: flex; align-items: center; justify-content: space-around; gap: 2px; }
 .tray-chip { display: inline-flex; align-items: center; flex: none; background: var(--mark); border-radius: 999px; }
 .tray-chip .btn.chip { background: transparent; border-color: transparent; padding-right: 2px; }
 .tray-chip .btn.icon.sm { border: none; background: transparent; }
@@ -424,3 +432,19 @@ mark.hl[data-n]::after { content: attr(data-n); display: inline-block; white-spa
 .vrow.doc-li { padding-left: 14px; position: relative; }
 .vrow.doc-li::before { content: "•"; position: absolute; left: 2px; top: 0; color: var(--muted); }
 .side-chat { border: 1px solid var(--line); border-radius: 14px; padding: 6px 8px; display: flex; flex-direction: column; gap: 6px; }
+
+/* Quick answers and claim checks (beside the chat, never replayed) */
+mark.hl.disputed { text-decoration: underline wavy var(--danger); text-decoration-thickness: 1.5px; text-underline-offset: 3px; }
+.quick-notes { display: flex; flex-direction: column; gap: 6px; margin: 4px 0; }
+.quick-note { border: 1px solid var(--line); border-left: 3px solid var(--warn); border-radius: 10px; padding: 4px 8px 6px; background: var(--surface); }
+.check-note { border-left-color: var(--found, var(--accent)); }
+.quick-head { display: flex; align-items: center; gap: 6px; width: 100%; min-height: 28px; border: none; background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; padding: 0; }
+.quick-turn { display: flex; flex-direction: column; gap: 2px; }
+.quick-q { margin: 4px 0 0; }
+.quick-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.verdict.ok, .claim.ok .claim-v { color: #2e9e6a; }
+.verdict.unsure, .claim.unsure .claim-v { color: var(--warn); }
+.verdict.bad, .claim.bad .claim-v { color: var(--danger); }
+.claim { display: flex; gap: 6px; align-items: flex-start; padding: 2px 0; }
+.claim-v { font-weight: 700; width: 1em; flex: none; }
+.claim-body { min-width: 0; }

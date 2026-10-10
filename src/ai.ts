@@ -356,6 +356,8 @@ export async function deleteBranch(cardId: string): Promise<{ sessionId: string;
   await db.vectors.where("cardId").anyOf(ids).delete();
   await db.highlights.where("cardId").anyOf(ids).delete();
   await db.visuals.where("cardId").anyOf(ids).delete();
+  await db.quicks.where("cardId").anyOf(ids).delete();
+  await db.checks.where("cardId").anyOf(ids).delete();
   const left = all.filter((c) => !doomed.has(c.id));
   if (!left.length) {
     await db.outlines.where("sessionId").equals(card.sessionId).delete();

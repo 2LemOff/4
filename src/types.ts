@@ -246,6 +246,60 @@ export interface Visual {
   updatedAt: number;
 }
 
+export type QuickVerdict = "ok" | "unsure" | "wrong";
+
+/** One question and short answer in a quick side thread. */
+export interface QuickTurn {
+  question: string;
+  answer: string;
+  status: JobStatus;
+  error?: string;
+  model: string;
+  usage?: Usage;
+  /** a second model's verdict on the answer */
+  check?: { status: JobStatus; verdict?: QuickVerdict; reason?: string; model: string; error?: string };
+}
+
+/**
+ * A quick side thread about highlighted words. It's shown under the answer and never replayed, so the
+ * branch history stays append-only; "Make it a branch" turns it into real questions and answers.
+ */
+export interface Quick {
+  id: string;
+  sessionId: string;
+  /** the answer it hangs under (the latest one the highlights come from) */
+  cardId: string;
+  highlightIds: string[];
+  quotes: string[];
+  turns: QuickTurn[];
+  createdAt: number;
+}
+
+export type ClaimVerdict = "supported" | "uncertain" | "disputed";
+export interface Claim {
+  claim: string;
+  /** the words it comes from */
+  quote: string;
+  verdict: ClaimVerdict;
+  reason: string;
+}
+
+/** Highlighted text split into claims, each judged by a second model. */
+export interface ClaimCheck {
+  id: string;
+  sessionId: string;
+  cardId: string;
+  highlightIds: string[];
+  quotes: string[];
+  status: JobStatus;
+  error?: string;
+  claims: Claim[];
+  model: string;
+  web: boolean;
+  usage?: Usage;
+  createdAt: number;
+}
+
 export interface Bookmark {
   id: string;
   sessionId: string;

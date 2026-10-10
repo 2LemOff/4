@@ -85,6 +85,7 @@ function Account() {
 
 function Models() {
   const m = useStore(modelsStore);
+  const s = useStore(settingsStore);
   const row = (label: string, hint: string, href: string) => (
     <button className="row-btn compact task-row" onClick={() => go(href)}>
       <strong>{label}</strong>
@@ -101,7 +102,21 @@ function Models() {
         <button className="btn chip" onClick={() => refreshModels(true)} disabled={m.loading}>{m.loading ? "Loading…" : "Refresh list"}</button>
       </p>
       <TaskList
-        answerExtra={<PromptSettings embedded />}
+        extras={{
+          answer: <PromptSettings embedded />,
+          quick: (
+            <label className="check">
+              <input type="checkbox" checked={s.quickAutoCheck} onChange={(e) => updateSettings({ quickAutoCheck: e.target.checked })} />
+              <span>Check every quick answer with a second model (Quick check)</span>
+            </label>
+          ),
+          claimCheck: (
+            <label className="check">
+              <input type="checkbox" checked={s.claimWebSearch} onChange={(e) => updateSettings({ claimWebSearch: e.target.checked })} />
+              <span>Search the web while checking (OpenRouter's web plugin; costs more)</span>
+            </label>
+          ),
+        }}
         extraRows={{
           Council: row("Members", "Who answers in the council (Settings › Council)", "#/settings/council"),
           Views: row("Study doc (synthesis)", "Style, prompt, length, language and model", "#/settings/synthesis"),

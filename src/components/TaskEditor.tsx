@@ -100,7 +100,7 @@ export function TaskEditor({ id, extra }: { id: TaskId; extra?: React.ReactNode 
 }
 
 /** Every task, grouped; each row opens its editor in a sheet. */
-export function TaskList({ answerExtra, extraRows }: { answerExtra?: React.ReactNode; extraRows?: Partial<Record<(typeof TASK_GROUPS)[number], React.ReactNode>> }) {
+export function TaskList({ extras, extraRows }: { extras?: Partial<Record<TaskId, React.ReactNode>>; extraRows?: Partial<Record<(typeof TASK_GROUPS)[number], React.ReactNode>> }) {
   useStore(settingsStore);
   useStore(modelsStore);
   const [open, setOpen] = useState<TaskId>();
@@ -122,7 +122,7 @@ export function TaskList({ answerExtra, extraRows }: { answerExtra?: React.React
       ))}
       {open && (
         <Sheet title={TASK[open].label} onClose={() => setOpen(undefined)}>
-          <TaskEditor id={open} extra={open === "answer" ? answerExtra : undefined} />
+          <TaskEditor id={open} extra={extras?.[open]} />
           <button className="btn primary" onClick={() => setOpen(undefined)}>Done</button>
         </Sheet>
       )}

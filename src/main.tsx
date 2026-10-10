@@ -8,6 +8,7 @@ import { initApp, updateSettings } from "./store";
 import { resumePending } from "./synthesis";
 import { resumeStories } from "./stories";
 import { resumeVisuals } from "./visuals";
+import { resumeQuick } from "./quick";
 import "./styles.css";
 
 /** Finish the OpenRouter sign-in when it redirects back with ?code=… */
@@ -32,6 +33,7 @@ async function boot() {
   void resumePending();
   void resumeStories();
   void resumeVisuals();
+  void resumeQuick();
   createRoot(document.getElementById("root")!).render(
     <StrictMode>
       <App />

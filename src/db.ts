@@ -1,5 +1,5 @@
 import Dexie, { type Table } from "dexie";
-import type { Bookmark, Card, Highlight, MediaRecord, Outline, Session, Visual } from "./types";
+import type { Bookmark, Card, ClaimCheck, Highlight, MediaRecord, Outline, Quick, Session, Visual } from "./types";
 import type { Story } from "./storyTypes";
 import { quantize } from "./search";
 
@@ -22,6 +22,8 @@ export class FractalDB extends Dexie {
   media!: Table<MediaRecord, string>;
   highlights!: Table<Highlight, string>;
   visuals!: Table<Visual, string>;
+  quicks!: Table<Quick, string>;
+  checks!: Table<ClaimCheck, string>;
 
   constructor(name = "fractal") {
     super(name);
@@ -50,6 +52,8 @@ export class FractalDB extends Dexie {
     this.version(3).stores({ highlights: "id,sessionId,cardId,createdAt" });
     // v4: saved visuals of answers and selections
     this.version(4).stores({ visuals: "id,sessionId,cardId,scopeKey,createdAt" });
+    // v5: quick side answers and claim checks (never replayed)
+    this.version(5).stores({ quicks: "id,sessionId,cardId,createdAt", checks: "id,sessionId,cardId,createdAt" });
   }
 }
 

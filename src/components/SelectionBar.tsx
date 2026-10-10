@@ -99,17 +99,22 @@ export function SelectionBar({
       onPointerUp={release}
       onPointerCancel={release}
     >
-      <button className="btn chip" onClick={onMark}>
-        <Icon name="highlight" size={15} /> Mark+
+      <button className="toolbtn" onClick={onMark}>
+        <Icon name="highlight" size={17} />
+        <span>Mark+</span>
       </button>
-      <button className="btn chip" onClick={onAsk}>Ask</button>
+      <button className="toolbtn" onClick={onAsk}>
+        <Icon name="up" size={17} />
+        <span>Ask</span>
+      </button>
       {children}
-      <button className="btn chip" onClick={onCopy}>
-        <Icon name="copy" size={15} /> Copy
+      <button className="toolbtn" onClick={onCopy}>
+        <Icon name="copy" size={17} />
+        <span>Copy</span>
       </button>
-      <span className="grow" />
-      <button className="btn icon sm" aria-label="Close selection bar" onClick={onClose}>
-        <Icon name="close" size={15} />
+      <button className="toolbtn" aria-label="Close selection bar" onClick={onClose}>
+        <Icon name="close" size={17} />
+        <span aria-hidden>Close</span>
       </button>
     </div>
   );

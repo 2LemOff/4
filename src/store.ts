@@ -54,6 +54,10 @@ export interface AppSettings {
   answerFormat: AnswerFormat;
   /** views (not the chat): lines shown before "Read more" */
   readMoreLines: number;
+  /** check every quick answer with the Quick check task */
+  quickAutoCheck: boolean;
+  /** claim checks may search the web (OpenRouter's web plugin; costs more) */
+  claimWebSearch: boolean;
   synthesis: SynthesisSettings;
   /** models that answered 400 to a mid-conversation effort update */
   blockedConfigUpdate: string[];
@@ -81,6 +85,8 @@ export const defaultAppSettings = (): AppSettings => ({
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
   answerFormat: "text",
   readMoreLines: 4,
+  quickAutoCheck: false,
+  claimWebSearch: false,
   synthesis: DEFAULT_SYNTHESIS,
   blockedConfigUpdate: [],
   backupReminderDays: 7,

@@ -103,13 +103,15 @@ export async function deleteMedia(ids: string[]): Promise<void> {
 export async function deleteTopics(sessionIds: string[]): Promise<void> {
   for (const sid of sessionIds) {
     const cardIds = (await db.cards.where("sessionId").equals(sid).primaryKeys()) as string[];
-    await db.transaction("rw", [db.sessions, db.cards, db.outlines, db.vectors, db.bookmarks, db.stories, db.media, db.highlights, db.visuals], async () => {
+    await db.transaction("rw", [db.sessions, db.cards, db.outlines, db.vectors, db.bookmarks, db.stories, db.media, db.highlights, db.visuals, db.quicks, db.checks], async () => {
       await db.cards.bulkDelete(cardIds);
       await db.vectors.where("cardId").anyOf(cardIds).delete();
       await db.outlines.where("sessionId").equals(sid).delete();
       await db.bookmarks.where("sessionId").equals(sid).delete();
       await db.highlights.where("sessionId").equals(sid).delete();
       await db.visuals.where("sessionId").equals(sid).delete();
+      await db.quicks.where("sessionId").equals(sid).delete();
+      await db.checks.where("sessionId").equals(sid).delete();
       await db.stories.where("sessionId").equals(sid).delete();
       await db.media.where("sessionId").equals(sid).delete();
       await db.sessions.delete(sid);

@@ -208,6 +208,7 @@ export async function mockOpenRouter(page: Page, opts: MockOptions = {}): Promis
         const o = opts.stream?.(body) ?? {};
         const prefix = userText.match(/\(Answer id prefix: (K\d+)\)$/)?.[1];
         let text = opts.answer ? opts.answer(userText, body) : prefix ? pyramidAnswer(prefix) : ANSWER;
+        if (userText.startsWith("Answer the question briefly")) text = userText.endsWith("Why?") ? "Because it is short." : "A short quick answer.";
         if (userText.includes("COUNCIL RESPONSES") && prefix) {
           // chairman: n5 has no source, n6 cites B (the verifier will reject n6)
           const a = JSON.parse(pyramidAnswer(prefix));
@@ -272,6 +273,9 @@ export async function mockOpenRouter(page: Page, opts: MockOptions = {}): Promis
           return reply(JSON.stringify({ nodes: [{ id: "n1", label: "Premise one", sources: [a] }, { id: "n2", label: "Premise two", sources: [b] }, { id: "n3", label: "Conclusion", sources: [c, "s999"] }], edges: [{ from: "n1", to: "n2", label: "supports", sources: [b] }, { from: "n2", to: "n3", label: "leads to", sources: [c] }] }));
         return reply(JSON.stringify({ steps: [{ label: "Start", detail: "", sources: [a] }] }));
       }
+      if (systemText.startsWith("Check the short answer below")) return reply(JSON.stringify({ verdict: "ok", reason: "Matches the text." }));
+      if (systemText.startsWith("Split the text into its distinct factual claims"))
+        return reply(JSON.stringify({ claims: [{ claim: "Premise two depends on premise one", quote: "depends on it", verdict: "supported", reason: "Stated in the answer." }, { claim: "Observers matter here", quote: "observers", verdict: "disputed", reason: "Not shown." }] }));
       if (userText.includes("list up to 8 more topics")) return reply(JSON.stringify({ names: ["Geology", "Astronomy", "Chemistry"] }));
       if (userText.includes("Describe the visual style")) return reply("Bold flat shapes in teal and orange on cream, thick outlines.");
       if (systemText.includes("Summarize the conversation")) return reply("We established that premise one is simple and premise two depends on it.");

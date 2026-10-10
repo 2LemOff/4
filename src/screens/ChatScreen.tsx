@@ -26,6 +26,9 @@ import { SelectionBar, useAnswerSelection } from "../components/SelectionBar";
 import { Sheet } from "../components/Sheet";
 import { StoryStartSheet } from "../components/StoryStartSheet";
 import { VisualizeSheet } from "../components/VisualizeSheet";
+import { CheckNotes, QuickNotes, QuickSheet } from "../components/QuickViews";
+import { startClaimCheck } from "../quick";
+import type { ClaimCheck, Quick } from "../types";
 import type { Anchor, Card, Highlight, VisualScope } from "../types";
 import { scopeCards } from "../visuals";
 import { hrefVisual } from "../route";
@@ -65,6 +68,8 @@ export function ChatScreen({ sid, focus, find, quote, ask }: { sid: string; focu
     highlights: await db.highlights.where("sessionId").equals(sid).toArray(),
     bookmarks: await db.bookmarks.where("sessionId").equals(sid).toArray(),
     visuals: await db.visuals.where("sessionId").equals(sid).toArray(),
+    quicks: await db.quicks.where("sessionId").equals(sid).toArray(),
+    checks: await db.checks.where("sessionId").equals(sid).toArray(),
   }), [sid]);
   const streams = useStore(streamStore);
   useStore(modelsStore);
@@ -88,6 +93,7 @@ export function ChatScreen({ sid, focus, find, quote, ask }: { sid: string; focu
   const [storyFor, setStoryFor] = useState<string>();
   const [visualize, setVisualize] = useState<{ cardId: string; scope: VisualScope }>();
   const [visualsFor, setVisualsFor] = useState<string>();
+  const [quickOpen, setQuickOpen] = useState<{ id?: string; draft?: { cardId: string; highlightIds: string[]; quotes: string[] } }>();
   const [toast, setToast] = useState("");
   const [councilOn, setCouncilOn] = useState(() => readCouncil(sid));
   const [councilSheet, setCouncilSheet] = useState(false);
@@ -121,6 +127,12 @@ export function ChatScreen({ sid, focus, find, quote, ask }: { sid: string; focu
   });
 
   const counts = useMemo(() => highlightBranches(cards), [cards]);
+  // highlights a claim check found something disputed in
+  const disputed = useMemo(() => {
+    const out = new Set<string>();
+    for (const c of data?.checks ?? []) if (c.claims.some((x) => x.verdict === "disputed")) c.highlightIds.forEach((h) => out.add(h));
+    return out;
+  }, [data?.checks]);
   const hlById = useMemo(() => new Map(highlights.map((h) => [h.id, h])), [highlights]);
   const trayIds = useMemo(() => new Set(tray), [tray]);
   const marksByCard = useMemo(() => {
@@ -128,11 +140,12 @@ export function ChatScreen({ sid, focus, find, quote, ask }: { sid: string; focu
     for (const h of highlights) {
       const n = counts.get(h.id) ?? 0;
       const list = m.get(h.cardId) ?? [];
-      list.push({ ...h, className: trayIds.has(h.id) ? "picked" : undefined, badge: n ? `↳ ${n}` : undefined });
+      const cls = [trayIds.has(h.id) ? "picked" : "", disputed.has(h.id) ? "disputed" : ""].filter(Boolean).join(" ");
+      list.push({ ...h, className: cls || undefined, badge: n ? `↳ ${n}` : undefined });
       m.set(h.cardId, list);
     }
     return m;
-  }, [highlights, counts, trayIds]);
+  }, [highlights, counts, trayIds, disputed]);
 
   if (!data) return <div className="center muted">Loading…</div>;
   if (!session || !leafId) {
@@ -243,6 +256,9 @@ export function ChatScreen({ sid, focus, find, quote, ask }: { sid: string; focu
               find={c.id === focus ? flash : undefined}
               onMenu={setAnswerMenu}
               visuals={data.visuals.filter((x) => x.cardId === c.id).length}
+              quicks={data.quicks.filter((x) => x.cardId === c.id)}
+              checks={data.checks.filter((x) => x.cardId === c.id)}
+              onQuick={(id) => setQuickOpen({ id })}
               onVisualize={() => setVisualize({ cardId: c.id, scope: { kind: "answer", cardIds: [c.id], label: short(c.question, 60) } })}
               onVisuals={() => setVisualsFor(c.id)}
               onContinue={(m) => {
@@ -269,7 +285,31 @@ export function ChatScreen({ sid, focus, find, quote, ask }: { sid: string; focu
             release={release}
           >
             <button
-              className="btn chip"
+              className="toolbtn"
+              onClick={async () => {
+                const picked = sel;
+                clearSel();
+                const h = await saveHighlight({ ...picked, sessionId: sid });
+                setQuickOpen({ draft: { cardId: h.cardId, highlightIds: [h.id], quotes: [h.quote] } });
+              }}
+            >
+              <Icon name="bolt" size={17} />
+              <span>Quick</span>
+            </button>
+            <button
+              className="toolbtn"
+              onClick={async () => {
+                const picked = sel;
+                clearSel();
+                const h = await saveHighlight({ ...picked, sessionId: sid });
+                await startClaimCheck({ sessionId: sid, cardId: h.cardId, highlightIds: [h.id], quotes: [h.quote] });
+              }}
+            >
+              <Icon name="check" size={17} />
+              <span>Check</span>
+            </button>
+            <button
+              className="toolbtn"
               onClick={async () => {
                 const picked = sel;
                 clearSel();
@@ -277,7 +317,8 @@ export function ChatScreen({ sid, focus, find, quote, ask }: { sid: string; focu
                 setVisualize({ cardId: h.cardId, scope: { kind: "highlight", cardIds: [h.cardId], highlightIds: [h.id], label: `“${short(h.quote, 50)}”` } });
               }}
             >
-              <Icon name="visualize" size={15} /> Visualize
+              <Icon name="visualize" size={17} />
+              <span>Visualize</span>
             </button>
           </SelectionBar>
         ) : (
@@ -290,9 +331,28 @@ export function ChatScreen({ sid, focus, find, quote, ask }: { sid: string; focu
             onRemove={(key) => (key === "quote" ? setAskQuote(undefined) : setTray((t) => t.filter((x) => x !== key)))}
             onClear={() => (setTray([]), setAskQuote(undefined))}
           >
+            {quotes.length > 0 && (
+              <>
+                <button className="toolbtn" onClick={() => setQuickOpen({ draft: { cardId: parentId, highlightIds: trayHs.map((h) => h.id), quotes } })}>
+                  <Icon name="bolt" size={17} />
+                  <span>Quick</span>
+                </button>
+                <button
+                  className="toolbtn"
+                  onClick={async () => {
+                    await startClaimCheck({ sessionId: sid, cardId: parentId, highlightIds: trayHs.map((h) => h.id), quotes });
+                    setTray([]);
+                    setAskQuote(undefined);
+                  }}
+                >
+                  <Icon name="check" size={17} />
+                  <span>Check</span>
+                </button>
+              </>
+            )}
             {trayHs.length > 0 && (
               <button
-                className="btn chip"
+                className="toolbtn"
                 onClick={() => {
                   const owner = trayHs.reduce((x, y) => (pathIndex.get(y.cardId)! > pathIndex.get(x.cardId)! ? y : x)).cardId;
                   setVisualize({
@@ -301,7 +361,8 @@ export function ChatScreen({ sid, focus, find, quote, ask }: { sid: string; focu
                   });
                 }}
               >
-                <Icon name="visualize" size={15} /> Visualize
+                <Icon name="visualize" size={17} />
+                <span>Visualize</span>
               </button>
             )}
           </HighlightTray>
@@ -407,6 +468,7 @@ export function ChatScreen({ sid, focus, find, quote, ask }: { sid: string; focu
         />
       )}
       {storyFor && <StoryStartSheet sessionId={sid} cardId={storyFor} onClose={() => setStoryFor(undefined)} />}
+      {quickOpen && <QuickSheet sessionId={sid} quickId={quickOpen.id} draft={quickOpen.draft} onClose={() => setQuickOpen(undefined)} />}
       {visualize && <VisualizeSheet sessionId={sid} cardId={visualize.cardId} scope={visualize.scope} onClose={() => setVisualize(undefined)} />}
       {visualsFor && (
         <Sheet title="Visuals of this answer" onClose={() => setVisualsFor(undefined)}>
@@ -447,6 +509,9 @@ function Turn({
   find,
   onMenu,
   visuals,
+  quicks,
+  checks,
+  onQuick,
   onVisualize,
   onVisuals,
   onContinue,
@@ -460,6 +525,9 @@ function Turn({
   find?: string;
   onMenu: (id: string) => void;
   visuals: number;
+  quicks: Quick[];
+  checks: ClaimCheck[];
+  onQuick: (id: string) => void;
   onVisualize: () => void;
   onVisuals: () => void;
   onContinue: (model: string) => void;
@@ -497,6 +565,8 @@ function Turn({
         ) : null}
         <RetryNotice card={card} />
         {card.council && <CouncilPanel council={card.council} onContinue={onContinue} />}
+        <QuickNotes quicks={quicks} onOpen={onQuick} />
+        <CheckNotes checks={checks} />
         {!streaming && (
           <div className="answer-foot">
             <button className="btn icon sm" aria-label="Visualize this answer" onClick={onVisualize}>

@@ -8,9 +8,12 @@ Mobile only. Runs in the phone browser (installable PWA). Everything stays on yo
 
 1. Ask a question. The box on Home grows with what you paste and keeps paragraph breaks.
 2. The answer arrives **whole, exactly as the model wrote it** (paragraphs, lists, tables). The app never cuts or shortens it.
-3. Select words in an answer. A slim bar above the question box offers:
+3. Select words in an answer. A slim bar of small icons above the question box offers:
    - **Mark+**: keep the words as a yellow highlight and collect them
    - **Ask**: the same, then type your question
+   - **Quick**: a short side answer (below)
+   - **Check**: a claim check (below)
+   - **Visualize** (below)
    - **Copy**
 4. Collected highlights wait in a **tray** above the question box, numbered 1, 2, 3… They can come from one answer or several. Your question is sent once, quoting all of them:
    ```
@@ -33,6 +36,15 @@ Mobile only. Runs in the phone browser (installable PWA). Everything stays on yo
 - a one-line question box with the quick questions (?), the council, the model settings and a round send button
 - the selection bar and the tray appear only while they're needed
 - no tab bar inside a topic
+
+## Quick answers and checks
+
+- **Quick** (on a selection or the tray) opens a small sheet with the quoted words and one-tap questions: Explain this, Give an example, Why is this true?, Define the terms. You can also type your own.
+  - The short answer uses the same conversation (so it's cheap with a prompt cache) and the **Quick answers** task: its model, prompt, length (1 sentence to 2 paragraphs) and settings.
+  - It appears under the answer it's about. Follow-ups continue the same side thread.
+  - **Check it** has a second model (the **Quick check** task) give ✓, ? or ✗ with a reason. This can also run on every quick answer.
+  - Quick answers are never sent with later questions. **Make it a branch** turns the side thread into real questions and answers in the tree.
+- **Check** (on a selection or the tray) splits the words into claims. Each claim is ✓ supported, ? uncertain or ✗ disputed, with a reason. A highlight with a disputed claim gets a red wavy underline. Web search (OpenRouter's web plugin) can be switched on in the **Claim check** task.
 
 ## Visualize
 

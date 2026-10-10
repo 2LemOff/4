@@ -25,10 +25,6 @@ export function HighlightTray({
   if (!items.length) return null;
   return (
     <div className="tray" role="group" aria-label="Highlights in your question">
-      <div className="tray-actions">
-        <button className="btn chip" onClick={onClear}>Clear</button>
-        {children}
-      </div>
       <div className="tray-items">
         {items.map((it, i) => (
           <span key={it.key} className="tray-chip">
@@ -40,6 +36,13 @@ export function HighlightTray({
             </button>
           </span>
         ))}
+      </div>
+      <div className="tray-actions">
+        {children}
+        <button className="toolbtn" onClick={onClear}>
+          <Icon name="close" size={17} />
+          <span>Clear</span>
+        </button>
       </div>
     </div>
   );

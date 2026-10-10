@@ -18,6 +18,9 @@ export interface BackupData {
   highlights?: unknown[];
   /** saved visuals (backups made before v4 have none) */
   visuals?: unknown[];
+  /** quick side answers and claim checks (backups made before v5 have none) */
+  quicks?: unknown[];
+  checks?: unknown[];
   media: Omit<MediaRecord, "blob">[];
   settings?: Omit<AppSettings, "apiKey">;
 }
@@ -37,6 +40,8 @@ export async function buildBackup(opts: { includeVideos: boolean; settings?: App
     stories: await db.stories.toArray(),
     highlights: await db.highlights.toArray(),
     visuals: await db.visuals.toArray(),
+    quicks: await db.quicks.toArray(),
+    checks: await db.checks.toArray(),
     media: media.map(({ blob: _b, ...meta }) => meta),
     settings,
   };
@@ -83,6 +88,8 @@ export async function restoreBackup(bytes: Uint8Array): Promise<{ sessions: numb
   await db.stories.bulkPut((data.stories ?? []) as never[]);
   await db.highlights.bulkPut((data.highlights ?? []) as never[]);
   await db.visuals.bulkPut((data.visuals ?? []) as never[]);
+  await db.quicks.bulkPut((data.quicks ?? []) as never[]);
+  await db.checks.bulkPut((data.checks ?? []) as never[]);
   let mediaCount = 0;
   for (const meta of data.media ?? []) {
     const path = Object.keys(files).find((p) => p.startsWith(`media/${meta.id}.`));
