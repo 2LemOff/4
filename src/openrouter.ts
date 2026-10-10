@@ -98,14 +98,21 @@ export function applyChunk(state: StreamState, data: string): StreamState {
 
 // ── Requests ─────────────────────────────────────────────────────────────────
 
-/** Anthropic models get cache_control on the system prompt so sibling branches share a cached prefix. */
+/**
+ * The request's messages: pictures become image parts of their turn, and Anthropic models get cache_control
+ * on the system prompt so sibling branches share a cached prefix.
+ */
 export function prepareMessages(model: string, messages: ChatMessage[]): unknown[] {
-  if (familyOf(model) !== "claude") return messages;
-  return messages.map((m, i) =>
-    i === 0 && m.role === "system" && m.content
-      ? { ...m, content: [{ type: "text", text: m.content, cache_control: { type: "ephemeral" } }] }
-      : m,
-  );
+  const claude = familyOf(model) === "claude";
+  if (!claude && !messages.some((m) => m.images?.length)) return messages;
+  return messages.map((m, i) => {
+    if (m.images?.length) {
+      const { images, ...rest } = m;
+      return { ...rest, content: [{ type: "text", text: m.content }, ...images.map((url) => ({ type: "image_url", image_url: { url } }))] };
+    }
+    if (claude && i === 0 && m.role === "system" && m.content) return { ...m, content: [{ type: "text", text: m.content, cache_control: { type: "ephemeral" } }] };
+    return m;
+  });
 }
 
 function headers(apiKey?: string): Record<string, string> {
@@ -274,13 +281,13 @@ export async function speak(apiKey: string, opts: { model: string; input: string
 }
 
 /** Ask a vision-capable model about one or more images (data URLs). */
-export async function describeImages(apiKey: string, model: string, prompt: string, images: string[]): Promise<string> {
+export async function describeImages(apiKey: string, model: string, prompt: string, images: string[], extra: Record<string, unknown> = { max_tokens: 2000 }): Promise<string> {
   const res = await fetch(`${API}/chat/completions`, {
     method: "POST",
     headers: headers(apiKey),
     body: JSON.stringify({
       model,
-      max_tokens: 2000,
+      ...extra,
       messages: [{ role: "user", content: [{ type: "text", text: prompt }, ...images.map((url) => ({ type: "image_url", image_url: { url } }))] }],
     }),
   });

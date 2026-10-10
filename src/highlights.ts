@@ -2,14 +2,15 @@ import { db, uid } from "./db";
 import type { TextAnchor } from "./anchors";
 import type { Highlight } from "./types";
 
-/** Save highlighted words (an identical highlight on the same answer is reused). */
-export async function saveHighlight(h: TextAnchor & { sessionId: string; cardId: string }): Promise<Highlight> {
-  const same = (await db.highlights.where("cardId").equals(h.cardId).toArray()).find((x) => x.start === h.start && x.end === h.end && x.quote === h.quote);
+/** Save highlighted words (an identical highlight on the same text is reused). */
+export async function saveHighlight(h: TextAnchor & { sessionId: string; cardId: string; part?: string }): Promise<Highlight> {
+  const same = (await db.highlights.where("cardId").equals(h.cardId).toArray()).find((x) => x.part === h.part && x.start === h.start && x.end === h.end && x.quote === h.quote);
   if (same) return same;
   const rec: Highlight = {
     id: uid(),
     sessionId: h.sessionId,
     cardId: h.cardId,
+    ...(h.part ? { part: h.part } : {}),
     quote: h.quote,
     start: h.start,
     end: h.end,

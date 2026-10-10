@@ -27,16 +27,20 @@ const NO_IMAGES = ["img"];
 
 /**
  * An answer shown whole, as the model wrote it (markdown), with highlights drawn on top. `data-answer` marks the
- * text a selection is measured in; it is set only once the answer is finished.
+ * text a selection is measured in; it is set only once the answer is finished. The text read from a picture of
+ * the question is shown the same way, as its own `part`.
  */
 export const AnswerText = memo(function AnswerText({
   cardId,
+  part,
   markdown,
   marks,
   find,
   selectable,
 }: {
   cardId: string;
+  /** not the answer but other text of the card, e.g. "img0": the text read from its first picture */
+  part?: string;
   markdown: string;
   marks: AnswerMark[];
   /** words to mark briefly (a search hit) */
@@ -59,7 +63,7 @@ export const AnswerText = memo(function AnswerText({
     return [[rehypeMarks, { resolve }]] as unknown as ComponentProps<typeof Markdown>["rehypePlugins"];
   }, [marks, find]);
   return (
-    <div className="answer-text" data-answer={selectable ? cardId : undefined}>
+    <div className="answer-text" data-answer={selectable ? cardId : undefined} data-part={selectable ? part : undefined}>
       <Markdown remarkPlugins={REMARK} rehypePlugins={plugins} components={COMPONENTS} disallowedElements={NO_IMAGES} unwrapDisallowed>
         {markdown}
       </Markdown>

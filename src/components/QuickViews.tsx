@@ -4,7 +4,7 @@ import { claimCounts, askQuick, checkQuickTurn, deleteCheck, deleteQuick, quickS
 import { go, hrefChat } from "../route";
 import { settingsStore, streamStore, updateSettings, useLive, useStore } from "../store";
 import { db } from "../db";
-import type { ClaimCheck, Quick, QuickTurn } from "../types";
+import type { ClaimCheck, Quick, QuickTurn, QuoteFrom } from "../types";
 import { AnswerText } from "./AnswerText";
 import { Icon } from "./Icon";
 import { shortName } from "./ModelPicker";
@@ -81,7 +81,7 @@ export function QuickSheet({
 }: {
   sessionId: string;
   quickId?: string;
-  draft?: { cardId: string; highlightIds: string[]; quotes: string[] };
+  draft?: { cardId: string; highlightIds: string[]; quotes: string[]; quoteFrom?: QuoteFrom[] };
   onClose: () => void;
 }) {
   const [id, setId] = useState(quickId);

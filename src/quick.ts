@@ -3,9 +3,10 @@ import { splitBlocks } from "./blocks";
 import { completeJSON, prepareMessages, streamChat } from "./openrouter";
 import { settingsStore, streamStore } from "./store";
 import { taskSetup } from "./taskConfig";
-import { buildMessages, highlightTurn, indexCards, type ChatMessage } from "./tree";
+import { buildMessages, highlightTurn, indexCards, pathToRoot, type ChatMessage } from "./tree";
+import { imageOptions } from "./photos";
 import { ANSWER_FORMAT, usesPyramids } from "./prompts";
-import type { Card, Claim, ClaimCheck, ClaimVerdict, Quick, QuickTurn, QuickVerdict } from "./types";
+import type { Card, Claim, ClaimCheck, ClaimVerdict, Quick, QuickTurn, QuickVerdict, QuoteFrom } from "./types";
 
 const key = () => settingsStore.get().apiKey;
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -17,8 +18,8 @@ export const quickStreamKey = (id: string, i: number) => `quick:${id}:${i}`;
  * Messages for a quick answer: the branch history exactly as it is (so the provider's prompt cache applies),
  * earlier turns of this quick thread, then the quick instructions with the quoted words and the question.
  */
-export function quickMessages(history: ChatMessage[], instructions: string, quotes: string[], turns: { question: string; answer: string }[], question: string): ChatMessage[] {
-  const ask = (q: string, first: boolean) => `${instructions}\n\n${first && quotes.length ? highlightTurn(quotes, q) : q}`;
+export function quickMessages(history: ChatMessage[], instructions: string, quotes: string[], turns: { question: string; answer: string }[], question: string, from?: QuoteFrom[]): ChatMessage[] {
+  const ask = (q: string, first: boolean) => `${instructions}\n\n${first && quotes.length ? highlightTurn(quotes, q, from) : q}`;
   const msgs = [...history];
   turns.forEach((t, i) => {
     msgs.push({ role: "user", content: ask(t.question, i === 0) });
@@ -68,10 +69,10 @@ async function patchQuick(id: string, fn: (q: Quick) => void) {
 }
 
 /** Start a quick thread about highlighted words (or quoted text) under an answer. */
-export async function startQuick(o: { sessionId: string; cardId: string; highlightIds: string[]; quotes: string[]; question: string }): Promise<string> {
+export async function startQuick(o: { sessionId: string; cardId: string; highlightIds: string[]; quotes: string[]; quoteFrom?: QuoteFrom[]; question: string }): Promise<string> {
   const id = uid();
   const model = taskSetup("quick").model;
-  await db.quicks.put({ id, sessionId: o.sessionId, cardId: o.cardId, highlightIds: o.highlightIds, quotes: o.quotes, turns: [{ question: o.question, answer: "", status: "running", model }], createdAt: Date.now() });
+  await db.quicks.put({ id, sessionId: o.sessionId, cardId: o.cardId, highlightIds: o.highlightIds, quotes: o.quotes, ...(o.quoteFrom ? { quoteFrom: o.quoteFrom } : {}), turns: [{ question: o.question, answer: "", status: "running", model }], createdAt: Date.now() });
   void runQuickTurn(id, 0);
   return id;
 }
@@ -100,8 +101,9 @@ export async function runQuickTurn(id: string, i: number): Promise<void> {
     const idx = indexCards(cards);
     // pyramid topics ask for JSON answers; a quick answer is plain text, so that section is left out here
     const sys = session ? (usesPyramids(session.systemPrompt) ? session.systemPrompt.replace(ANSWER_FORMAT, "").trim() : session.systemPrompt) : "";
-    const history = idx.has(q.cardId) ? buildMessages(idx, q.cardId, "", undefined, { systemPrompt: sys, model: t.model }).slice(0, -1) : [];
-    const msgs = quickMessages(history, t.prompt, q.quotes, q.turns.slice(0, i).filter((x) => x.status === "done"), turn.question);
+    const path = idx.has(q.cardId) ? pathToRoot(idx, q.cardId) : [];
+    const history = path.length ? buildMessages(idx, q.cardId, "", undefined, { systemPrompt: sys, model: t.model, ...(await imageOptions(t.model, path)) }).slice(0, -1) : [];
+    const msgs = quickMessages(history, t.prompt, q.quotes, q.turns.slice(0, i).filter((x) => x.status === "done"), turn.question, q.quoteFrom);
     streamStore.set((s) => ({ ...s, [sk]: { content: "", reasoning: "" } }));
     const st = await streamChat({
       apiKey: key(),
@@ -182,7 +184,10 @@ export async function quickToBranch(id: string): Promise<string | undefined> {
       id: uid(),
       sessionId: q.sessionId,
       parentId: parent,
-      anchor: k === 0 && q.quotes.length ? { text: q.quotes.join(" / "), quotes: q.quotes, scope: "highlights", highlightIds: q.highlightIds.length ? q.highlightIds : undefined } : undefined,
+      anchor:
+        k === 0 && q.quotes.length
+          ? { text: q.quotes.join(" / "), quotes: q.quotes, scope: "highlights", highlightIds: q.highlightIds.length ? q.highlightIds : undefined, ...(q.quoteFrom ? { quoteFrom: q.quoteFrom } : {}) }
+          : undefined,
       question: t.question,
       blocks: splitBlocks(t.answer),
       assistant: { content: t.answer },

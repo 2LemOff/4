@@ -6,39 +6,40 @@ const CORS = {
   "access-control-allow-methods": "GET,POST,OPTIONS",
 };
 
+const SEES = { input_modalities: ["text", "image"], output_modalities: ["text"] };
 export const MODELS = [
   {
-    id: "google/gemini-3.5-pro", name: "Gemini 3.5 Pro", created: 400, context_length: 1_000_000,
+    id: "google/gemini-3.5-pro", architecture: SEES, name: "Gemini 3.5 Pro", created: 400, context_length: 1_000_000,
     pricing: { prompt: "0.000002", completion: "0.000012" },
     supported_parameters: ["max_tokens", "temperature", "top_p", "seed", "reasoning", "structured_outputs"],
     reasoning: { supported_efforts: ["high", "medium", "low", "minimal"], default_effort: "medium", default_enabled: true, mandatory: true, supports_max_tokens: true },
   },
   {
-    id: "google/gemini-3.6-flash", name: "Gemini 3.6 Flash", created: 410, context_length: 1_000_000,
+    id: "google/gemini-3.6-flash", architecture: SEES, name: "Gemini 3.6 Flash", created: 410, context_length: 1_000_000,
     pricing: { prompt: "0.0000003", completion: "0.0000025" },
     supported_parameters: ["max_tokens", "temperature", "reasoning", "structured_outputs"],
     reasoning: { supported_efforts: ["high", "medium", "low", "minimal"], default_effort: "low", default_enabled: true, mandatory: true, supports_max_tokens: true },
   },
   {
-    id: "anthropic/claude-sonnet-5.5", name: "Claude Sonnet 5.5", created: 300, context_length: 1_000_000,
+    id: "anthropic/claude-sonnet-5.5", architecture: SEES, name: "Claude Sonnet 5.5", created: 300, context_length: 1_000_000,
     pricing: { prompt: "0.000002", completion: "0.00001" },
     supported_parameters: ["max_tokens", "reasoning", "structured_outputs"],
     reasoning: { supported_efforts: ["max", "xhigh", "high", "medium", "low", "minimal"], default_effort: "medium", default_enabled: true, supports_max_tokens: true },
   },
   {
-    id: "anthropic/claude-opus-5.5", name: "Claude Opus 5.5", created: 310, context_length: 1_000_000,
+    id: "anthropic/claude-opus-5.5", architecture: SEES, name: "Claude Opus 5.5", created: 310, context_length: 1_000_000,
     pricing: { prompt: "0.000004", completion: "0.00002" },
     supported_parameters: ["max_tokens", "temperature", "reasoning", "structured_outputs"],
     reasoning: { supported_efforts: ["max", "xhigh", "high", "medium", "low", "minimal"], default_effort: "medium", default_enabled: true, supports_max_tokens: true },
   },
   {
-    id: "x-ai/grok-4.5", name: "Grok 4.5", created: 350, context_length: 256_000,
+    id: "x-ai/grok-4.5", architecture: { input_modalities: ["text"], output_modalities: ["text"] }, name: "Grok 4.5", created: 350, context_length: 256_000,
     pricing: { prompt: "0.000003", completion: "0.000015" },
     supported_parameters: ["max_tokens", "temperature", "top_p", "reasoning"],
     reasoning: { supported_efforts: ["high", "low"], default_effort: "low", default_enabled: false },
   },
   {
-    id: "openai/gpt-5.6-sol", name: "GPT-5.6 Sol", created: 380, context_length: 400_000,
+    id: "openai/gpt-5.6-sol", architecture: SEES, name: "GPT-5.6 Sol", created: 380, context_length: 400_000,
     pricing: { prompt: "0.0000025", completion: "0.000015" },
     supported_parameters: ["max_tokens", "reasoning", "verbosity", "seed"],
     reasoning: { supported_efforts: ["xhigh", "high", "medium", "low", "none"], default_effort: "medium", default_enabled: true },
@@ -142,6 +143,9 @@ export function pyramidAnswer(prefix: string): string {
     ],
   });
 }
+
+/** What the mock reads from any picture. */
+export const OCR_TEXT = "Hooke's law: the force grows with the stretch.\nThe spring constant sets the slope.";
 
 const ANSWER = "Premise one is simple.\n\nPremise two depends on it. It has a second sentence about observers.\n\nPremise three concludes.";
 
@@ -283,6 +287,7 @@ export async function mockOpenRouter(page: Page, opts: MockOptions = {}): Promis
         return reply(JSON.stringify({ claims: [{ claim: "Premise two depends on premise one", quote: "depends on it", verdict: "supported", reason: "Stated in the answer." }, { claim: "Observers matter here", quote: "observers", verdict: "disputed", reason: "Not shown." }] }));
       if (userText.includes("list up to 8 more topics")) return reply(JSON.stringify({ names: ["Geology", "Astronomy", "Chemistry"] }));
       if (userText.includes("Describe the visual style")) return reply("Bold flat shapes in teal and orange on cream, thick outlines.");
+      if (userText.startsWith("Copy all the text in the image")) return reply(OCR_TEXT);
       if (systemText.includes("Summarize the conversation")) return reply("We established that premise one is simple and premise two depends on it.");
       if (systemText.includes("Respond with JSON only, matching: { title")) {
         const ids = [...userText.matchAll(/\[(\w{8})\]/g)].map((m) => m[1]);

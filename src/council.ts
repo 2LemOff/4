@@ -1,7 +1,8 @@
 import { db } from "./db";
 import { modelInfo, settingsStore, streamStore, modelsStore } from "./store";
 import { completeJSON, completeText, prepareMessages, streamChat } from "./openrouter";
-import { buildMessages, indexCards, type ChatMessage } from "./tree";
+import { buildMessages, indexCards, pathToRoot, type ChatMessage } from "./tree";
+import { imageOptions, type ImageOptions } from "./photos";
 import { buildRequestParams, settingsControls } from "./modelRules";
 import { cardPrefix, embedCards, settingsFor } from "./ai";
 import { taskModel, taskSetup } from "./taskConfig";
@@ -82,8 +83,12 @@ export async function runCouncil(cardId: string): Promise<void> {
     return;
   }
 
+  // attached pictures: members that can't see them get the text read from them
+  const parentPath = card.parentId ? pathToRoot(idx, card.parentId) : [];
+  const pictures = new Map<string, ImageOptions>();
+  for (const m of new Set([...members, chairman])) pictures.set(m, await imageOptions(m, parentPath, card));
   const historyFor = (model: string): ChatMessage[] =>
-    buildMessages(idx, card.parentId, card.question, card.anchor, { systemPrompt: session.systemPrompt, model, includeConfigUpdates: false }, card.seq);
+    buildMessages(idx, card.parentId, card.question, card.anchor, { systemPrompt: session.systemPrompt, model, includeConfigUpdates: false, ...pictures.get(model) }, card.seq);
   const wantsSchema = (model: string) => modelInfo(model).supported_parameters?.includes("structured_outputs");
 
   // 1. members answer in parallel
@@ -162,7 +167,7 @@ export async function runCouncil(cardId: string): Promise<void> {
     : "";
   const ranking = council.aggregate.length ? `\n\nAVERAGE RANKING: ${council.aggregate.map((a) => `${a.label} (${a.avgRank})`).join(", ")}` : "";
   const rules = textMode ? taskSetup("chairman").prompt : `${taskSetup("chairman").prompt.replace(TASK.chairman.fixed ?? "", "").trim()}\n\n${CHAIRMAN_PYRAMID_FORMAT}`;
-  history.push({ role: "user", content: `${rules}\n\nCOUNCIL RESPONSES:\n${responses}${reviews}${ranking}\n\nTHE LEARNER'S MESSAGE:\n${lastTurn.content}` });
+  history.push({ role: "user", content: `${rules}\n\nCOUNCIL RESPONSES:\n${responses}${reviews}${ranking}\n\nTHE LEARNER'S MESSAGE:\n${lastTurn.content}`, ...(lastTurn.images ? { images: lastTurn.images } : {}) });
   const chairSettings = withReasoning(card.modelSettings ?? settingsFor(chairman), chairman);
   const body: Record<string, unknown> = {
     model: chairman,

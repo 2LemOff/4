@@ -27,15 +27,19 @@ import { Sheet } from "../components/Sheet";
 import { StoryStartSheet } from "../components/StoryStartSheet";
 import { VisualizeSheet } from "../components/VisualizeSheet";
 import { CheckNotes, QuickNotes, QuickSheet } from "../components/QuickViews";
+import { ImageTexts, MessageThumbs, PictureSheet } from "../components/MessageImages";
+import type { Box } from "../components/Attachments";
 import { startClaimCheck } from "../quick";
 import type { ClaimCheck, Quick } from "../types";
-import type { Anchor, Card, Highlight, VisualScope } from "../types";
+import type { Anchor, Card, Highlight, QuoteFrom, VisualScope } from "../types";
 import { scopeCards } from "../visuals";
 import { hrefVisual } from "../route";
 
 const NO_MARKS: AnswerMark[] = [];
 const NO_CARDS: Card[] = [];
 const NO_HIGHLIGHTS: Highlight[] = [];
+/** marks are kept per text: an answer, or the text read from one of its question's pictures */
+const markKey = (cardId: string, part?: string) => (part ? `${cardId}|${part}` : cardId);
 
 const councilKey = (sid: string) => `fractal.council.${sid}`;
 function readCouncil(sid: string): boolean {
@@ -93,11 +97,13 @@ export function ChatScreen({ sid, focus, find, quote, ask }: { sid: string; focu
   const [storyFor, setStoryFor] = useState<string>();
   const [visualize, setVisualize] = useState<{ cardId: string; scope: VisualScope }>();
   const [visualsFor, setVisualsFor] = useState<string>();
-  const [quickOpen, setQuickOpen] = useState<{ id?: string; draft?: { cardId: string; highlightIds: string[]; quotes: string[] } }>();
+  const [quickOpen, setQuickOpen] = useState<{ id?: string; draft?: { cardId: string; highlightIds: string[]; quotes: string[]; quoteFrom?: QuoteFrom[] } }>();
   const [toast, setToast] = useState("");
   const [councilOn, setCouncilOn] = useState(() => readCouncil(sid));
   const [councilSheet, setCouncilSheet] = useState(false);
   const [forceModel, setForceModel] = useState<{ id: string; n: number }>();
+  const [picture, setPicture] = useState<{ cardId: string; i: number }>();
+  const [addPicture, setAddPicture] = useState<{ blob: Blob; box: Box; n: number }>();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const { sel, clear: clearSel, press, release } = useAnswerSelection();
 
@@ -139,10 +145,11 @@ export function ChatScreen({ sid, focus, find, quote, ask }: { sid: string; focu
     const m = new Map<string, AnswerMark[]>();
     for (const h of highlights) {
       const n = counts.get(h.id) ?? 0;
-      const list = m.get(h.cardId) ?? [];
+      const key = markKey(h.cardId, h.part);
+      const list = m.get(key) ?? [];
       const cls = [trayIds.has(h.id) ? "picked" : "", disputed.has(h.id) ? "disputed" : ""].filter(Boolean).join(" ");
       list.push({ ...h, className: cls || undefined, badge: n ? `↳ ${n}` : undefined });
-      m.set(h.cardId, list);
+      m.set(key, list);
     }
     // a council answer shows which members each paragraph came from
     for (const c of cards) {
@@ -179,6 +186,9 @@ export function ChatScreen({ sid, focus, find, quote, ask }: { sid: string; focu
   let parentId: string = leafId;
   if (quotes.length) {
     anchor = { text: quotes.join(" / "), quotes, scope: "highlights", highlightIds: trayHs.length ? trayHs.map((h) => h.id) : undefined };
+    // words highlighted in the text read from the learner's own picture are asked about as such
+    const from: QuoteFrom[] = [...trayHs.map((h): QuoteFrom => (h.part ? "picture" : "answer")), ...(askQuote ? ["answer" as const] : [])];
+    if (from.includes("picture")) anchor.quoteFrom = from;
     const owners = [...trayHs.map((h) => h.cardId), ...(quoteCard ? [quoteCard] : [])];
     if (owners.length) parentId = owners.reduce((a, b) => (pathIndex.get(b)! > pathIndex.get(a)! ? b : a));
   }
@@ -266,6 +276,8 @@ export function ChatScreen({ sid, focus, find, quote, ask }: { sid: string; focu
               live={streams[c.id]}
               pyramid={pyramid}
               marks={marksByCard.get(c.id) ?? NO_MARKS}
+              partMarks={(part) => marksByCard.get(markKey(c.id, part)) ?? NO_MARKS}
+              onPicture={(i) => setPicture({ cardId: c.id, i })}
               find={c.id === focus ? flash : undefined}
               onMenu={setAnswerMenu}
               visuals={data.visuals.filter((x) => x.cardId === c.id).length}
@@ -303,7 +315,7 @@ export function ChatScreen({ sid, focus, find, quote, ask }: { sid: string; focu
                 const picked = sel;
                 clearSel();
                 const h = await saveHighlight({ ...picked, sessionId: sid });
-                setQuickOpen({ draft: { cardId: h.cardId, highlightIds: [h.id], quotes: [h.quote] } });
+                setQuickOpen({ draft: { cardId: h.cardId, highlightIds: [h.id], quotes: [h.quote], ...(h.part ? { quoteFrom: ["picture" as const] } : {}) } });
               }}
             >
               <Icon name="bolt" size={17} />
@@ -357,7 +369,7 @@ export function ChatScreen({ sid, focus, find, quote, ask }: { sid: string; focu
                   <Icon name="council" size={17} />
                   <span>Council</span>
                 </button>
-                <button className="toolbtn" onClick={() => setQuickOpen({ draft: { cardId: parentId, highlightIds: trayHs.map((h) => h.id), quotes } })}>
+                <button className="toolbtn" onClick={() => setQuickOpen({ draft: { cardId: parentId, highlightIds: trayHs.map((h) => h.id), quotes, quoteFrom: anchor?.quoteFrom } })}>
                   <Icon name="bolt" size={17} />
                   <span>Quick</span>
                 </button>
@@ -404,9 +416,12 @@ export function ChatScreen({ sid, focus, find, quote, ask }: { sid: string; focu
           onCouncilToggle={() => setCouncil(!councilOn)}
           onCouncilSettings={() => setCouncilSheet(true)}
           forceModel={forceModel}
+          attach
+          addPicture={addPicture}
           onAsked={(r) => {
             setTray([]);
             setAskQuote(undefined);
+            setAddPicture(undefined);
             go(hrefChat(r.sessionId, { focus: r.cardId }));
           }}
         />
@@ -491,6 +506,17 @@ export function ChatScreen({ sid, focus, find, quote, ask }: { sid: string; focu
           onClose={() => setOpenHighlight(undefined)}
         />
       )}
+      {picture && idx.get(picture.cardId) && (
+        <PictureSheet
+          card={idx.get(picture.cardId)!}
+          i={picture.i}
+          onPart={(blob, box) => {
+            setAddPicture({ blob, box, n: Date.now() });
+            inputRef.current?.focus();
+          }}
+          onClose={() => setPicture(undefined)}
+        />
+      )}
       {storyFor && <StoryStartSheet sessionId={sid} cardId={storyFor} onClose={() => setStoryFor(undefined)} />}
       {quickOpen && <QuickSheet sessionId={sid} quickId={quickOpen.id} draft={quickOpen.draft} onClose={() => setQuickOpen(undefined)} />}
       {visualize && <VisualizeSheet sessionId={sid} cardId={visualize.cardId} scope={visualize.scope} onClose={() => setVisualize(undefined)} />}
@@ -530,6 +556,8 @@ function Turn({
   live,
   pyramid,
   marks,
+  partMarks,
+  onPicture,
   find,
   onMenu,
   visuals,
@@ -546,6 +574,9 @@ function Turn({
   live?: StreamView;
   pyramid: boolean;
   marks: AnswerMark[];
+  /** highlights in the text read from the question's pictures */
+  partMarks: (part: string) => AnswerMark[];
+  onPicture: (i: number) => void;
   find?: string;
   onMenu: (id: string) => void;
   visuals: number;
@@ -564,6 +595,7 @@ function Turn({
   return (
     <section className="turn">
       <div className="msg-user" data-card-id={card.id}>
+        {card.images?.length ? <MessageThumbs card={card} onOpen={onPicture} /> : null}
         {quotes.map((q, k) => (
           <p key={k} className="quote-line">{q}</p>
         ))}
@@ -580,6 +612,7 @@ function Turn({
           </div>
         )}
       </div>
+      {card.images?.length ? <ImageTexts card={card} marks={partMarks} /> : null}
       <div className="msg-ai">
         {streaming && <ReasoningPanel assistant={card.assistant} live={live?.reasoning} />}
         {md ? (

@@ -4,6 +4,8 @@ import { Icon } from "./Icon";
 
 export interface SelectedText extends TextAnchor {
   cardId: string;
+  /** the text read from a picture of the question ("img0"), not the answer */
+  part?: string;
 }
 
 const elementOf = (n: Node) => (n.nodeType === Node.ELEMENT_NODE ? (n as Element) : n.parentElement);
@@ -27,7 +29,7 @@ export function readSelection(): SelectedText | undefined {
   const start = startBox ? at(range.startContainer, range.startOffset) : 0;
   const end = box.contains(range.endContainer) ? at(range.endContainer, range.endOffset) : text.length;
   const a = makeAnchor(text, start, end);
-  return a && { ...a, cardId: box.dataset.answer };
+  return a && { ...a, cardId: box.dataset.answer, ...(box.dataset.part ? { part: box.dataset.part } : {}) };
 }
 
 /**

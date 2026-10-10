@@ -61,6 +61,28 @@ describe("prepareMessages", () => {
     const out = prepareMessages("anthropic/claude-opus-5", [{ role: "system", content: "S" }, cfg]) as any[];
     expect(out[1]).toBe(cfg);
   });
+  it("sends pictures as image parts of their own turn", () => {
+    const msgs = [
+      { role: "system" as const, content: "SYS" },
+      { role: "user" as const, content: "What is this?", images: ["data:image/webp;base64,AAA", "data:image/webp;base64,BBB"] },
+      { role: "assistant" as const, content: "A spring." },
+      { role: "user" as const, content: "And this part?" },
+    ];
+    for (const model of ["google/gemini-3.5-pro", "anthropic/claude-opus-5"]) {
+      const out = prepareMessages(model, msgs) as any[];
+      expect(out[1]).toEqual({
+        role: "user",
+        content: [
+          { type: "text", text: "What is this?" },
+          { type: "image_url", image_url: { url: "data:image/webp;base64,AAA" } },
+          { type: "image_url", image_url: { url: "data:image/webp;base64,BBB" } },
+        ],
+      });
+      expect(out[1].images).toBeUndefined();
+      expect(out[2]).toBe(msgs[2]);
+      expect(out[3]).toBe(msgs[3]);
+    }
+  });
 });
 
 describe("helpers", () => {

@@ -9,6 +9,7 @@ import { splitBlocks } from "./blocks";
 import { makeFreshCard } from "./context";
 import { rerankPrompt, sessionPrompt, usesPyramids } from "./prompts";
 import { settingsFor, taskModel, taskSetup } from "./taskConfig";
+import { imageOptions } from "./photos";
 import { ANSWER_SCHEMA, answerTitle, parseAnswer, prefixFor, pruneCrossLinks, textAnswer, type Answer } from "./answer";
 import { hitText, keywordSearch, quantize, topCards } from "./search";
 import type { Anchor, Card, ModelSettings, Session } from "./types";
@@ -43,6 +44,8 @@ export interface AskOptions {
   council?: boolean;
   /** asked from a visual's side chat */
   fromVisual?: string;
+  /** photos or screenshots (already shrunk) sent with the question */
+  images?: { blob: Blob; label: string; partOf?: number }[];
 }
 
 /** Create the card (and the session, for a first question) and start streaming. Returns immediately. */
@@ -84,6 +87,14 @@ export async function ask(o: AskOptions): Promise<{ cardId: string; sessionId: s
     status: "streaming",
     createdAt: now,
   };
+  if (o.images?.length) {
+    card.images = [];
+    for (const [i, im] of o.images.entries()) {
+      const mediaId = uid();
+      await db.media.put({ id: mediaId, sessionId, kind: "image", mime: im.blob.type || "image/webp", size: im.blob.size, label: `${o.question.slice(0, 40)} · photo ${i + 1}`, blob: im.blob, createdAt: now });
+      card.images.push({ mediaId, label: im.label, partOf: im.partOf });
+    }
+  }
   await db.cards.put(card);
   void run(cardId);
   return { cardId, sessionId };
@@ -124,12 +135,20 @@ export async function run(cardId: string, opts: { noSchema?: boolean } = {}): Pr
   }
   await db.cards.update(cardId, { configUpdate, effortUsed: nextEffort, status: "streaming", error: undefined });
 
+  // pictures are replayed in their own turn (or, for a model that can't see them, the text found in them)
+  const pictures = await imageOptions(card.model, parentPath, card);
   const messages: ChatMessage[] = buildMessages(
     idx,
     card.parentId,
     card.question,
     card.anchor,
-    { systemPrompt: session.systemPrompt, model: card.model, includeConfigUpdates: canUpdate, newConfigUpdate: configUpdate },
+    {
+      systemPrompt: session.systemPrompt,
+      model: card.model,
+      includeConfigUpdates: canUpdate,
+      newConfigUpdate: configUpdate,
+      ...pictures,
+    },
     card.seq,
   );
   const pyramidMode = usesPyramids(session.systemPrompt) && card.seq !== undefined;
@@ -352,6 +371,9 @@ export async function deleteBranch(cardId: string): Promise<{ sessionId: string;
     for (const c of all) if (c.parentId && doomed.has(c.parentId) && !doomed.has(c.id)) (doomed.add(c.id), (grew = true));
   }
   const ids = [...doomed];
+  // the pictures sent with these questions go with them
+  const pictures = all.filter((c) => doomed.has(c.id)).flatMap((c) => c.images?.map((im) => im.mediaId) ?? []);
+  if (pictures.length) await db.media.bulkDelete(pictures);
   await db.cards.bulkDelete(ids);
   await db.vectors.where("cardId").anyOf(ids).delete();
   await db.highlights.where("cardId").anyOf(ids).delete();

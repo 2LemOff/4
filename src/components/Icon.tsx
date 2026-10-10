@@ -30,6 +30,13 @@ const PATHS: Record<string, string> = {
   back: "M15 18l-6-6 6-6",
   bolt: "M13 2 4 14h7l-1 8 9-12h-7z",
   visualize: "M12 5.5a2 2 0 1 1 0 .01M5 18.5a2 2 0 1 1 0 .01M19 18.5a2 2 0 1 1 0 .01M11 7.5l-5 9M13 7.5l5 9M7 18.5h10",
+  camera: "M4 8h3.5l1.5-2.5h6L16.5 8H20v11H4zM12 10.5a3.25 3.25 0 1 1 0 6.5 3.25 3.25 0 0 1 0-6.5z",
+  image: "M4 5h16v14H4zM4 16l5-5 4 4 2.5-2.5L20 17M15.5 8.5h.01",
+  file: "M6 3h8l4 4v14H6zM14 3v4h4",
+  paste: "M9 3h6v3H9zM7 4.5H5V21h14V4.5h-2M8.5 11h7M8.5 15h5",
+  crop: "M7 3v14h14M3 7h14v14",
+  text: "M5 7V5h14v2M12 5v14M9 19h6",
+  attach: "M12 5v14M5 12h14",
 };
 
 export type IconName = keyof typeof PATHS;

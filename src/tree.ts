@@ -1,4 +1,4 @@
-import type { Anchor, Card, ReasoningDetail } from "./types";
+import type { Anchor, Card, QuoteFrom, ReasoningDetail } from "./types";
 
 export type CardIndex = Map<string, Card>;
 export const indexCards = (cards: Card[]): CardIndex => new Map(cards.map((c) => [c.id, c]));
@@ -70,20 +70,26 @@ export function treeRows(idx: CardIndex): { card: Card; depth: number }[] {
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
   content: string;
+  /** pictures sent with this turn (data URLs); turned into image parts when the request is made */
+  images?: string[];
   reasoning?: string;
   reasoning_details?: ReasoningDetail[];
   configuration_update?: { reasoning: { effort: string } };
 }
 
 /** A question about highlighted words: one quote, or several numbered quotes sent as one prompt. */
-export function highlightTurn(quotes: string[], question: string): string {
-  if (quotes.length === 1) return `About this part of your previous answer: "${quotes[0]}"\n\nMy question: ${question}`;
-  return `About these parts of your previous answers:\n${quotes.map((t, i) => `${i + 1}. "${t}"`).join("\n")}\n\nMy question: ${question}`;
+export function highlightTurn(quotes: string[], question: string, from?: QuoteFrom[]): string {
+  const pic = (i: number) => from?.[i] === "picture";
+  const all = quotes.every((_, i) => pic(i));
+  if (quotes.length === 1) return `About this part of ${all ? "the text in my picture" : "your previous answer"}: "${quotes[0]}"\n\nMy question: ${question}`;
+  const head = all ? "the text in my pictures" : quotes.some((_, i) => pic(i)) ? "our conversation" : "your previous answers";
+  const mixed = !all && quotes.some((_, i) => pic(i));
+  return `About these parts of ${head}:\n${quotes.map((t, i) => `${i + 1}. "${t}"${mixed && pic(i) ? " (from my picture)" : ""}`).join("\n")}\n\nMy question: ${question}`;
 }
 
 export function userTurn(anchor: Anchor | undefined, question: string, seq?: number): string {
   let q = question;
-  if (anchor && anchor.scope === "highlights" && anchor.quotes?.length) q = highlightTurn(anchor.quotes, question);
+  if (anchor && anchor.scope === "highlights" && anchor.quotes?.length) q = highlightTurn(anchor.quotes, question, anchor.quoteFrom);
   else if (anchor && anchor.scope === "pyramid") q = `About this pyramid from your previous answer:\n${anchor.text}\n\nMy question: ${question}`;
   else if (anchor && anchor.scope === "category") q = `About this category from your previous answer:\n${anchor.text}\n\nMy question: ${question}`;
   else if (anchor && anchor.quotes && anchor.quotes.length > 1)
@@ -101,6 +107,12 @@ export interface BuildOptions {
   includeConfigUpdates?: boolean;
   /** effort change for the new question */
   newConfigUpdate?: { effort: string };
+  /** pictures of earlier turns (by card id) and of the new question, replayed in their own turn */
+  images?: (cardId: string) => string[] | undefined;
+  newImages?: string[];
+  /** for models that can't see pictures: text added to a turn instead (by card id, and for the new question) */
+  imageText?: (cardId: string) => string | undefined;
+  newImageText?: string;
 }
 
 /**
@@ -123,7 +135,10 @@ export function buildMessages(
     if (opts.includeConfigUpdates && c.configUpdate) {
       msgs.push({ role: "system", content: "", configuration_update: { reasoning: { effort: c.configUpdate.effort } } });
     }
-    msgs.push({ role: "user", content: userTurn(c.anchor, c.question, c.seq) });
+    const imgs = opts.images?.(c.id);
+    const note = opts.imageText?.(c.id);
+    const turn = note ? `${userTurn(c.anchor, c.question, c.seq)}\n\n${note}` : userTurn(c.anchor, c.question, c.seq);
+    msgs.push(imgs?.length ? { role: "user", content: turn, images: imgs } : { role: "user", content: turn });
     const a: ChatMessage = { role: "assistant", content: c.assistant.content };
     if (c.model === opts.model) {
       if (c.assistant.reasoning_details?.length) a.reasoning_details = c.assistant.reasoning_details;
@@ -134,7 +149,8 @@ export function buildMessages(
   if (opts.includeConfigUpdates && opts.newConfigUpdate) {
     msgs.push({ role: "system", content: "", configuration_update: { reasoning: { effort: opts.newConfigUpdate.effort } } });
   }
-  msgs.push({ role: "user", content: userTurn(anchor, question, seq) });
+  const last = opts.newImageText ? `${userTurn(anchor, question, seq)}\n\n${opts.newImageText}` : userTurn(anchor, question, seq);
+  msgs.push(opts.newImages?.length ? { role: "user", content: last, images: opts.newImages } : { role: "user", content: last });
   return msgs;
 }
 

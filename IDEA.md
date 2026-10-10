@@ -46,6 +46,16 @@ Mobile only. Runs in the phone browser (installable PWA). Everything stays on yo
   - Quick answers are never sent with later questions. **Make it a branch** turns the side thread into real questions and answers in the tree.
 - **Check** (on a selection or the tray) splits the words into claims. Each claim is ✓ supported, ? uncertain or ✗ disputed, with a reason. A highlight with a disputed claim gets a red wavy underline. Web search (OpenRouter's web plugin) can be switched on in the **Claim check** task.
 
+## Photos and screenshots
+
+- **+** next to the question box (on Home and in the chat) offers **Take a photo**, **Photos and screenshots**, **From files** and **Paste a copied picture**. Pasting a picture straight into the question box works too.
+- Pictures are made smaller (at most 1600 px, WebP) and kept on the phone with the topic. Their thumbnails wait above the question box; ✕ removes one. With no question typed, they're sent with "Explain this picture."
+- **Ask about a part:** the box button on a thumbnail, or **Ask about a part of it** on a picture you already sent, lets you draw a box over what you mean. The part is cut from the picture as it was taken (so it stays sharp) and sent along with the whole picture, and the model is told which picture it is a close-up of.
+- If the chosen model can't see pictures, one that can is used instead (the newest of the same family, else Gemini Pro, Claude Opus or ChatGPT) and named under the box. While pictures are attached, ⚙ lists only models that can see them.
+- **Read the text** under a sent picture: the **Text from images** task (Settings › Models › Photos) copies the picture's text below your message. That text can be highlighted like an answer (Mark+, Ask, Quick, Check, Visualize, the tray), and the question then says the words come from your picture.
+- **History stays append-only:** a picture is replayed in the turn it was sent with. A model that can't see pictures (a council member, say) gets the text read from them instead; the app reads it first when needed.
+- Deleting an answer and its branches deletes the pictures sent with those questions. Backups include them.
+
 ## Visualize
 
 Any answer, one highlight, the tray (several highlights), a branch or the whole topic can be seen in other ways:

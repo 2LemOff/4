@@ -123,6 +123,14 @@ describe("chat branches and highlights", () => {
     expect(highlightTurn(["a"], "Q")).toBe(userTurn({ text: "a", quotes: ["a"], scope: "highlights" }, "Q"));
   });
 
+  it("says when the quoted words are from the text read from the learner's picture", () => {
+    expect(userTurn({ text: "F = kx", quotes: ["F = kx"], scope: "highlights", quoteFrom: ["picture"] }, "Why?")).toBe('About this part of the text in my picture: "F = kx"\n\nMy question: Why?');
+    expect(highlightTurn(["a", "b"], "Q", ["picture", "picture"])).toBe('About these parts of the text in my pictures:\n1. "a"\n2. "b"\n\nMy question: Q');
+    expect(highlightTurn(["a", "b"], "Q", ["answer", "picture"])).toBe('About these parts of our conversation:\n1. "a"\n2. "b" (from my picture)\n\nMy question: Q');
+    // older anchors (no quoteFrom) read exactly as before
+    expect(highlightTurn(["a", "b"], "Q", undefined)).toBe(userTurn(t2.anchor, "Q").replace(/"x"/, '"a"').replace(/"y"/, '"b"'));
+  });
+
   it("replays older anchors exactly as before", () => {
     expect(userTurn({ text: "A", quotes: ["A", "B"], nodeIds: ["K1.n1", "K1.n2"], scope: "points" }, "Q")).toBe('About these points from your previous answers:\n- "A"\n- "B"\n\nMy question: Q');
     expect(userTurn({ text: "S" }, "Q")).toBe('About this statement from your previous answer: "S"\n\nMy question: Q');

@@ -84,12 +84,27 @@ export interface Anchor {
   scope?: "points" | "pyramid" | "category" | "highlights";
   /** chat highlights this question is about (their quotes are in `quotes`) */
   highlightIds?: string[];
+  /** where each quote is from, set only when one is from the text read from a picture of the learner's */
+  quoteFrom?: QuoteFrom[];
   /** v1 sentence anchors (kept so old sessions replay unchanged) */
   blockIdx?: number;
   sentenceIdx?: number;
 }
 
 export type CardStatus = "streaming" | "done" | "error" | "refused" | "length";
+export type QuoteFrom = "answer" | "picture";
+
+/** A photo or screenshot attached to a question (the picture itself is in `media`). */
+export interface CardImage {
+  mediaId: string;
+  label: string;
+  /** a part of another attached image, chosen with a box */
+  partOf?: number;
+  /** the text found in it (highlightable) */
+  text?: string;
+  textStatus?: "running" | "done" | "error";
+  textError?: string;
+}
 
 export interface Card {
   id: string;
@@ -121,6 +136,8 @@ export interface Card {
   portalFrom?: string;
   /** asked from a visual's side chat (the study doc) */
   fromVisual?: string;
+  /** photos or screenshots sent with the question */
+  images?: CardImage[];
   createdAt: number;
 }
 
@@ -216,6 +233,8 @@ export interface Highlight {
   id: string;
   sessionId: string;
   cardId: string;
+  /** words in the text found in an attached image ("img0"), not in the answer */
+  part?: string;
   quote: string;
   start: number;
   end: number;
@@ -279,6 +298,7 @@ export interface Quick {
   cardId: string;
   highlightIds: string[];
   quotes: string[];
+  quoteFrom?: QuoteFrom[];
   turns: QuickTurn[];
   createdAt: number;
 }

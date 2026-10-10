@@ -38,6 +38,7 @@ export function Home() {
         defaultModel={roleModel("answer")}
         big
         autoFocus
+        attach
         council={council}
         onCouncilToggle={() => setCouncil(!council)}
         onCouncilSettings={() => setSheet(true)}
