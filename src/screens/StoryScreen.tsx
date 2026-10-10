@@ -6,7 +6,7 @@ import { go, hrefChat } from "../route";
 import { settingsStore, updateSettings, useLive, useStore } from "../store";
 import { Icon } from "../components/Icon";
 import type { PictureType, StorySlide } from "../storyTypes";
-import { imageSetup, imageSlide, loadMediaModels, mediaStore, setPicture, videoSetup, videoSlide } from "../media";
+import { imageSetup, imageSlide, loadMediaModels, mediaStore, pollVideo, setPicture, videoSetup, videoSlide } from "../media";
 import { formatPrice } from "../mediaSettings";
 
 const SPEEDS = [0.75, 1, 1.25, 1.5, 2];
@@ -129,7 +129,9 @@ export function StoryScreen({ id }: { id: string }) {
   const regenerate = () => (s.picture === "image" ? imageSlide(story.id, i, true) : s.picture === "video" ? makeVideo() : drawSlide(story.id, i, true));
   const missingLabel =
     s.picture === "image" ? `Generate AI image · ${formatPrice(img.price)}` : s.picture === "video" ? `Generate video · ${formatPrice(vid.price)}` : "Regenerate picture";
-  const working = busy(s.pictureStatus) || (s.picture === "video" && !!s.videoJob);
+  // a finished clip whose download failed: offer the download again (a new video would cost again)
+  const downloadPending = s.picture === "video" && s.videoJob?.status === "completed" && s.pictureStatus === "error";
+  const working = busy(s.pictureStatus) || (s.picture === "video" && !!s.videoJob && !downloadPending);
   const waitText = s.picture === "video" ? `Making the video${s.videoJob ? ` (${s.videoJob.status.replace("_", " ")})` : ""}… You can leave; it continues later.` : s.picture === "image" ? "Painting the image…" : "Drawing the picture…";
   const voiceMissing = !s.audioId && !busy(s.audioStatus);
 
@@ -159,6 +161,7 @@ export function StoryScreen({ id }: { id: string }) {
         </div>
         <p className="muted small story-count">
           Slide {i + 1} of {story.slides.length} · {s.heading}
+          {s.pictureCost !== undefined && s.picture !== "shapes" ? ` · picture cost $${s.pictureCost.toFixed(s.pictureCost < 0.01 ? 4 : 2)}` : ""}
         </p>
         <div className="story-caption" aria-label="Caption">
           {sentences(s.narration).map((t, k) => (
@@ -170,7 +173,8 @@ export function StoryScreen({ id }: { id: string }) {
         <p className="muted small">Tap a sentence to ask about it.</p>
         {(pictureMissing || voiceMissing) && (
           <div className="chips">
-            {pictureMissing && <button className="btn chip" onClick={regenerate}>{missingLabel}</button>}
+            {downloadPending && <button className="btn chip" onClick={() => void pollVideo(story.id, i)}>Download the video again</button>}
+            {pictureMissing && !downloadPending && <button className="btn chip" onClick={regenerate}>{missingLabel}</button>}
             {voiceMissing && <button className="btn chip" onClick={() => narrateSlide(story.id, i, true)}>Regenerate narration</button>}
           </div>
         )}

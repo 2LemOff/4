@@ -3,7 +3,7 @@
  * - image models: `supported_parameters` maps each request field to a typed descriptor
  *   (an enum with its values, a numeric range with min/max, or a boolean), at model level and per endpoint;
  * - video models: `supported_durations`, `supported_resolutions`, `supported_aspect_ratios`,
- *   `supported_sizes` (optional), `generate_audio`, and `pricing_skus`.
+ *   `supported_sizes` (optional) and `pricing_skus`.
  * The exact shapes vary between examples in the docs, so everything here is parsed tolerantly.
  */
 
@@ -83,9 +83,15 @@ export function videoControls(m: VideoModel): MediaControl[] {
   choice("duration", m.supported_durations);
   choice("resolution", m.supported_resolutions);
   choice("aspect_ratio", m.supported_aspect_ratios);
-  choice("size", m.supported_sizes);
-  if (m.generate_audio) out.push({ key: "generate_audio", kind: "toggle" });
+  // `size` is interchangeable with resolution + aspect ratio: offer it only when they aren't
+  if (!m.supported_resolutions?.length && !m.supported_aspect_ratios?.length) choice("size", m.supported_sizes);
   return out;
+}
+
+/** The supported duration closest to `target` seconds (5 s: long enough for a slide, cheap enough). */
+export function preferredDuration(durations: number[] | null | undefined, target = 5): number | undefined {
+  if (!durations?.length) return undefined;
+  return [...durations].sort((a, b) => Math.abs(a - target) - Math.abs(b - target) || a - b)[0];
 }
 
 /** Defaults for a set of controls: keep valid saved values, else the first option / the minimum / off. */
@@ -112,37 +118,75 @@ export interface PriceRange {
   max: number;
   /** what the estimate is based on */
   basis: string;
+  /** the cost can't be known in advance (token pricing) */
+  unknown?: boolean;
 }
 
-const MEGAPIXELS: Record<string, number> = { "0.5k": 0.25, "1k": 1, "2k": 4, "4k": 16 };
+/** One billable line of an image endpoint: `{billable, unit, cost_usd, variant?}` (older shapes are read too). */
+export interface PriceLine {
+  billable: string;
+  unit: string;
+  cost: number;
+  variant?: string;
+}
 
-/**
- * Estimated cost of one image from an endpoint's pricing lines. Pricing can be per image, per megapixel
- * or per token; token pricing can't be known in advance, so it returns undefined.
- */
-export function estimateImagePrice(pricing: unknown, params: Record<string, unknown> = {}): PriceRange | undefined {
-  const lines: [string, number][] = [];
+export function pricingLines(pricing: unknown): PriceLine[] {
+  const out: PriceLine[] = [];
   if (Array.isArray(pricing)) {
     for (const p of pricing as any[]) {
-      const v = num(p?.price ?? p?.amount ?? p?.cost);
-      if (v !== undefined) lines.push([String(p?.unit ?? p?.sku ?? p?.name ?? p?.type ?? ""), v]);
+      const cost = num(p?.cost_usd ?? p?.price ?? p?.amount ?? p?.cost);
+      if (cost === undefined) continue;
+      const unit = String(p?.unit ?? "image").toLowerCase();
+      out.push({ billable: String(p?.billable ?? "output_image").toLowerCase(), unit, cost, variant: p?.variant ? String(p.variant).toLowerCase() : undefined });
     }
   } else if (pricing && typeof pricing === "object") {
+    // an older map like { image: "0.04" }
     for (const [k, x] of Object.entries(pricing as Record<string, unknown>)) {
-      const v = num(x);
-      if (v !== undefined && v > 0) lines.push([k, v]);
+      const cost = num(x);
+      if (cost === undefined || cost <= 0) continue;
+      const key = k.toLowerCase();
+      if (/megapixel|\bmp\b/.test(key)) out.push({ billable: "output_image", unit: "megapixel", cost });
+      else if (/image|request|generation|per_unit/.test(key)) out.push({ billable: "output_image", unit: "image", cost });
     }
   }
-  const per = (re: RegExp) => lines.filter(([k]) => re.test(k.toLowerCase())).map(([, v]) => v);
-  const images = per(/image|request|generation|output_unit|per_unit/).filter((v) => v > 0);
-  if (images.length) return { min: Math.min(...images), max: Math.max(...images), basis: "per image" };
-  const mp = per(/megapixel|\bmp\b|per_mp/);
-  if (mp.length) {
-    const res = String(params.resolution ?? "1K").toLowerCase();
-    const n = MEGAPIXELS[res] ?? 1;
-    return { min: Math.min(...mp) * n, max: Math.max(...mp) * n, basis: `per megapixel × ${n} MP` };
-  }
-  return undefined;
+  return out;
+}
+
+/** Approximate megapixels of a resolution tier (the docs' tiers: 512, 768, 1K, 1.5K, 2K, 4K). */
+export function tierMegapixels(resolution: unknown): number {
+  const r = String(resolution ?? "1K").trim().toLowerCase();
+  const k = r.match(/^([\d.]+)\s*k$/);
+  const side = k ? Number(k[1]) * 1024 : Number(r);
+  return isFinite(side) && side > 0 ? +((side * side) / 1e6).toFixed(2) : 1.05;
+}
+
+/**
+ * Estimated cost of one image from an endpoint's pricing lines: output-image lines (per image or per
+ * megapixel, with resolution-tiered `variant` lines matched to the chosen resolution), plus reference
+ * images when some are sent. Token-priced endpoints can't be known in advance.
+ */
+export function estimateImagePrice(pricing: unknown, params: Record<string, unknown> = {}, references = 0): PriceRange | undefined {
+  const lines = pricingLines(pricing);
+  const res = String(params.resolution ?? params.size ?? "").toLowerCase();
+  const pick = (billable: string) => {
+    const all = lines.filter((l) => l.billable === billable);
+    const tiered = all.filter((l) => l.variant && l.variant === res);
+    return tiered.length ? tiered : all.filter((l) => !l.variant).length ? all.filter((l) => !l.variant) : all;
+  };
+  const out = pick("output_image");
+  if (!out.length) return undefined;
+  if (out.every((l) => l.unit === "token")) return { min: 0, max: 0, basis: "per token", unknown: true };
+  const mp = tierMegapixels(params.resolution ?? params.size);
+  const cost = (l: PriceLine) => (l.unit === "megapixel" ? l.cost * mp : l.unit === "token" ? NaN : l.cost);
+  const outCosts = out.map(cost).filter((x) => isFinite(x));
+  const refCosts = references > 0 ? pick("input_reference").map((l) => (l.unit === "megapixel" ? l.cost * 1 : l.cost) * references).filter((x) => isFinite(x)) : [];
+  const refMin = refCosts.length ? Math.min(...refCosts) : 0;
+  const refMax = refCosts.length ? Math.max(...refCosts) : 0;
+  const basis = [
+    out.some((l) => l.unit === "megapixel") ? `per megapixel × ~${mp} MP` : "per image",
+    refCosts.length ? `+ ${references} reference image${references > 1 ? "s" : ""}` : "",
+  ].filter(Boolean).join(" ");
+  return { min: Math.min(...outCosts) + refMin, max: Math.max(...outCosts) + refMax, basis };
 }
 
 /**
@@ -168,16 +212,17 @@ export function estimateVideoPrice(skus: Record<string, string | number> | null 
       const audible = pick.some(([k]) => silent(k)) ? (k: string) => !silent(k) : withAudio;
       if (pick.some(([k]) => audible(k)) && pick.some(([k]) => !audible(k))) pick = pick.filter(([k]) => audible(k) === opts.audio);
     }
-    if (pick.length === 1) return { min: pick[0][1] * secs, max: pick[0][1] * secs, basis: `${pick[0][0]} × ${secs}s` };
+    if (pick.length === 1) return { min: pick[0][1] * secs, max: pick[0][1] * secs, basis: `${pick[0][0]} × ${secs} s` };
     const vals = (pick.length ? pick : perSecond).map(([, v]) => v * secs);
-    return { min: Math.min(...vals), max: Math.max(...vals), basis: `per second × ${secs}s (range)` };
+    return { min: Math.min(...vals), max: Math.max(...vals), basis: `per second × ${secs} s (range, see details)` };
   }
   const vals = entries.map(([, v]) => v);
-  return { min: Math.min(...vals), max: Math.max(...vals), basis: "per clip" };
+  return { min: Math.min(...vals), max: Math.max(...vals), basis: vals.length > 1 ? "per clip (range, see details)" : "per clip" };
 }
 
 export const formatPrice = (p?: PriceRange) => {
   if (!p) return "price unknown";
+  if (p.unknown) return "known when done (priced per token)";
   const f = (x: number) => (x < 0.01 ? `$${x.toFixed(4)}` : `$${x.toFixed(2)}`);
   return p.min === p.max ? `about ${f(p.min)}` : `${f(p.min)}–${f(p.max)}`;
 };

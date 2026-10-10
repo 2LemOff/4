@@ -49,6 +49,10 @@ export interface StorySettings {
   voice: string;
   /** sent to the speech model where supported */
   speechSpeed: number;
+  /** narrator style, sent as `instructions` (OpenAI and Gemini voices follow it; others ignore it) */
+  narratorStyle: string;
+  /** speech models that refused a speed setting (sent without it from then on) */
+  noSpeedModels: string[];
   /** player speed (audio.playbackRate) */
   playbackRate: number;
   autoplay: boolean;
@@ -56,7 +60,7 @@ export interface StorySettings {
   imageParams: Record<string, unknown>;
   videoModel: string;
   videoParams: Record<string, unknown>;
-  /** play the clip's own sound instead of muting it under the narration */
+  /** the clip's own sound: asked for (generate_audio) and played; off = a silent clip under the narration */
   videoSound: boolean;
   /** the latest style screenshots (small JPEG data URLs), for image models that accept references */
   refImages: string[];
@@ -76,6 +80,8 @@ export const DEFAULT_STORY: StorySettings = {
   voiceModel: "",
   voice: "alloy",
   speechSpeed: 1,
+  narratorStyle: "",
+  noSpeedModels: [],
   playbackRate: 1,
   autoplay: true,
   imageModel: "",

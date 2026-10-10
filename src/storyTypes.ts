@@ -20,6 +20,8 @@ export interface StorySlide {
   /** a remote clip url kept when the download was blocked */
   videoUrl?: string;
   videoJob?: { id: string; model: string; status: string; startedAt: number };
+  /** what the AI image or video cost (usage.cost) */
+  pictureCost?: number;
   audioId?: string;
   audioStatus: PartStatus;
   audioError?: string;

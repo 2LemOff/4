@@ -38,9 +38,12 @@ const isText = (m: ModelInfo) =>
 const newestFirst = (a: ModelInfo, b: ModelInfo) =>
   (b.created ?? 0) - (a.created ?? 0) || b.id.localeCompare(a.id);
 
+/** Variants such as `:batch`, `:free` or `:nitro` are never picked as a family's default. */
+const isVariant = (m: ModelInfo) => m.id.includes(":");
+
 /** The newest models of a picker family, newest first. */
 export function familyModels(models: ModelInfo[], family: PickerFamily, limit = 6): ModelInfo[] {
-  return models.filter((m) => isText(m) && MATCH[family](m)).sort(newestFirst).slice(0, limit);
+  return models.filter((m) => isText(m) && !isVariant(m) && MATCH[family](m)).sort(newestFirst).slice(0, limit);
 }
 
 export function newestOf(models: ModelInfo[], family: PickerFamily): ModelInfo | undefined {
@@ -55,7 +58,7 @@ export interface RoleDefaults {
 
 /** Defaults per role: newest Gemini Pro answers, newest Gemini Flash tags, newest Claude Sonnet reranks. */
 export function roleDefaults(models: ModelInfo[]): RoleDefaults {
-  const any = models.filter(isText).sort(newestFirst)[0]?.id;
+  const any = models.filter((m) => isText(m) && !isVariant(m)).sort(newestFirst)[0]?.id;
   return {
     answer: newestOf(models, "gemini-pro")?.id ?? any,
     tags: newestOf(models, "gemini-flash")?.id ?? newestOf(models, "gemini-pro")?.id ?? any,

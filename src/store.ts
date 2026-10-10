@@ -104,7 +104,8 @@ const DAY = 24 * 3600 * 1000;
 
 export async function refreshModels(force = false) {
   const cur = modelsStore.get();
-  if (!force && cur.models.length && cur.fetchedAt && Date.now() - cur.fetchedAt < DAY) return;
+  // a cache from before speech models were listed (or whose speech list failed) is refreshed now
+  if (!force && cur.models.length && cur.fetchedAt && Date.now() - cur.fetchedAt < DAY && cur.speechModels?.length) return;
   modelsStore.set({ ...cur, loading: true, error: undefined });
   try {
     const [models, embedModels, speechModels] = await Promise.all([

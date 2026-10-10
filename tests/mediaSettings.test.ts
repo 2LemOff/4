@@ -6,6 +6,8 @@ import {
   formatPrice,
   imageControls,
   maxReferences,
+  preferredDuration,
+  pricingLines,
   requestParams,
   supportedFromError,
   videoControls,
@@ -57,12 +59,23 @@ describe("video controls", () => {
   };
   it("builds choices from the model's supported lists and skips missing ones", () => {
     const c = videoControls(veo);
-    expect(c.map((x) => x.key)).toEqual(["duration", "resolution", "aspect_ratio", "generate_audio"]);
+    expect(c.map((x) => x.key)).toEqual(["duration", "resolution", "aspect_ratio"]);
+  });
+  it("never offers size next to resolution or aspect ratio (they are interchangeable)", () => {
+    expect(videoControls({ ...veo, supported_sizes: ["1280x720"] }).map((x) => x.key)).not.toContain("size");
+    expect(videoControls({ id: "x", supported_sizes: ["1280x720", "1920x1080"] }).map((x) => x.key)).toEqual(["size"]);
   });
   it("defaults keep valid saved values only", () => {
     const c = videoControls(veo);
-    expect(defaultsFor(c, { duration: 8, resolution: "4K" })).toEqual({ duration: 8, resolution: "720p", aspect_ratio: "16:9", generate_audio: false });
+    expect(defaultsFor(c, { duration: 8, resolution: "4K" })).toEqual({ duration: 8, resolution: "720p", aspect_ratio: "16:9" });
     expect(requestParams(c, { duration: 8, nope: 1 })).toEqual({ duration: 8 });
+  });
+  it("starts at the supported duration closest to 5 seconds, not the shortest", () => {
+    expect(preferredDuration([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])).toBe(5);
+    expect(preferredDuration([4, 6, 8])).toBe(4);
+    expect(preferredDuration([8, 10])).toBe(8);
+    expect(preferredDuration([])).toBeUndefined();
+    expect(defaultsFor(videoControls({ id: "x", supported_durations: [1, 5, 10] }), {}, { duration: preferredDuration([1, 5, 10]) })).toEqual({ duration: 5 });
   });
   it("estimates price from pricing_skus by resolution, audio and duration", () => {
     expect(estimateVideoPrice(veo.pricing_skus, { duration: 8, resolution: "1080p" })).toMatchObject({ min: 4.8, max: 4.8 });
@@ -86,9 +99,38 @@ describe("video controls", () => {
 });
 
 describe("image price", () => {
-  it("per image, per megapixel, or unknown for tokens", () => {
+  it("reads the documented pricing lines (cost_usd per billable and unit)", () => {
+    expect(pricingLines([{ billable: "output_image", unit: "image", cost_usd: 0.05 }])).toEqual([{ billable: "output_image", unit: "image", cost: 0.05, variant: undefined }]);
+    expect(estimateImagePrice([{ billable: "output_image", unit: "image", cost_usd: 0.05 }])).toMatchObject({ min: 0.05, max: 0.05, basis: "per image" });
+  });
+  it("prices megapixels from the resolution tier", () => {
+    const p = estimateImagePrice([{ billable: "output_image", unit: "megapixel", cost_usd: 0.03 }], { resolution: "2K" })!;
+    expect(p.min).toBeCloseTo(0.03 * 4.19, 3);
+    expect(estimateImagePrice([{ billable: "output_image", unit: "megapixel", cost_usd: 0.03 }], { resolution: "512" })!.min).toBeCloseTo(0.03 * 0.26, 3);
+  });
+  it("uses the variant line for the chosen resolution", () => {
+    const tiers = [
+      { billable: "output_image", unit: "image", cost_usd: 0.04, variant: "1k" },
+      { billable: "output_image", unit: "image", cost_usd: 0.08, variant: "2k" },
+      { billable: "output_image", unit: "image", cost_usd: 0.16, variant: "4k" },
+    ];
+    expect(estimateImagePrice(tiers, { resolution: "2K" })).toMatchObject({ min: 0.08, max: 0.08 });
+    expect(estimateImagePrice(tiers, { resolution: "8K" })).toMatchObject({ min: 0.04, max: 0.16 });
+  });
+  it("adds reference images only when they are sent, and ignores input-image lines", () => {
+    const lines = [
+      { billable: "output_image", unit: "image", cost_usd: 0.04 },
+      { billable: "input_reference", unit: "image", cost_usd: 0.01 },
+      { billable: "input_image", unit: "image", cost_usd: 0.5 },
+    ];
+    expect(estimateImagePrice(lines, {}, 0)).toMatchObject({ min: 0.04, max: 0.04 });
+    expect(estimateImagePrice(lines, {}, 2)).toMatchObject({ min: 0.06, max: 0.06, basis: "per image + 2 reference images" });
+  });
+  it("token pricing is known only when done; older maps still work", () => {
+    const t = estimateImagePrice([{ billable: "output_image", unit: "token", cost_usd: 0.00003 }]);
+    expect(t?.unknown).toBe(true);
+    expect(formatPrice(t)).toBe("known when done (priced per token)");
     expect(estimateImagePrice({ image: "0.04" })).toMatchObject({ min: 0.04, basis: "per image" });
-    expect(estimateImagePrice([{ unit: "megapixel", price: 0.03 }], { resolution: "2K" })).toMatchObject({ min: 0.12 });
     expect(estimateImagePrice({ prompt: "0.000001", completion: "0.00003" })).toBeUndefined();
     expect(formatPrice(undefined)).toBe("price unknown");
   });

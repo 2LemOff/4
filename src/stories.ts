@@ -1,6 +1,6 @@
 import { db, uid } from "./db";
-import { modelInfo, modelsStore, settingsStore } from "./store";
-import { completeJSON, completeText, describeImages, speak } from "./openrouter";
+import { modelInfo, modelsStore, settingsStore, updateSettings } from "./store";
+import { completeJSON, completeText, describeImages, OpenRouterError, speak } from "./openrouter";
 import { buildRequestParams } from "./modelRules";
 import { cardAnswer, roleModel, settingsFor } from "./ai";
 import { outlineText, subsetOutline } from "./answer";
@@ -18,8 +18,34 @@ export function drawModel(): string {
   return cfg().drawModel || newestOf(modelsStore.get().models, "claude-sonnet")?.id || roleModel("answer") || "";
 }
 export function voiceModel(): string {
-  const list = modelsStore.get().speechModels ?? [];
-  return cfg().voiceModel || list.find((m) => /gpt-4o-mini-tts/.test(m.id))?.id || list[0]?.id || "";
+  const list = (modelsStore.get().speechModels ?? []).filter((m) => !m.id.includes(":"));
+  return cfg().voiceModel || list.find((m) => /gpt-4o-mini-tts/.test(m.id))?.id || [...list].sort((a, b) => (b.created ?? 0) - (a.created ?? 0))[0]?.id || "";
+}
+
+/** The voices a speech model lists (`supported_voices`); empty when the model doesn't say. */
+export const voicesFor = (model: string): string[] => modelsStore.get().speechModels?.find((m) => m.id === model)?.supported_voices ?? [];
+
+/** The chosen voice when the model offers it, otherwise the model's first voice. */
+export function voiceName(model = voiceModel()): string {
+  const voices = voicesFor(model);
+  const v = cfg().voice;
+  if (!voices.length) return v || "alloy";
+  return voices.includes(v) ? v : voices[0];
+}
+
+/** Speak with the narration settings. A model that refuses `speed` is remembered and asked again without it. */
+async function narrate(input: string): Promise<Blob> {
+  const model = voiceModel();
+  const s = cfg();
+  const speed = s.noSpeedModels.includes(model) ? undefined : s.speechSpeed;
+  const opts = { model, input, voice: voiceName(model), speed, instructions: s.narratorStyle };
+  try {
+    return await speak(key(), opts);
+  } catch (e) {
+    if (!(e instanceof OpenRouterError) || e.status !== 400 || !speed || speed === 1) throw e;
+    updateSettings((x) => ({ story: { ...x.story, noSpeedModels: [...new Set([...x.story.noSpeedModels, model])] } }));
+    return speak(key(), { ...opts, speed: undefined });
+  }
 }
 export function visionModel(): string {
   const ms = modelsStore.get().models.filter((m) => (m.architecture as { input_modalities?: string[] } | undefined)?.input_modalities?.includes("image"));
@@ -138,10 +164,10 @@ export async function narrateSlide(id: string, i: number, force = false): Promis
   const slide = st?.slides[i];
   if (!st || !slide || (slide.audioStatus === "done" && slide.audioId && !force)) return;
   const model = voiceModel();
-  if (!model) return patchSlide(id, i, { audioStatus: "error", audioError: "Choose a voice model in Settings › Story." });
+  if (!model) return patchSlide(id, i, { audioStatus: "error", audioError: "No voice model yet: open Settings › Story and tap Refresh models." });
   await patchSlide(id, i, { audioStatus: "running", audioError: undefined });
   try {
-    const blob = await speak(key(), { model, input: slide.narration, voice: cfg().voice, speed: cfg().speechSpeed });
+    const blob = await narrate(slide.narration);
     const mediaId = uid();
     await db.media.put({ id: mediaId, sessionId: st.sessionId, storyId: id, kind: "audio", mime: blob.type || "audio/mpeg", size: blob.size, label: `${st.title || "Story"} · narration ${i + 1}`, blob, createdAt: Date.now() });
     if (slide.audioId) await db.media.delete(slide.audioId);
@@ -153,7 +179,8 @@ export async function narrateSlide(id: string, i: number, force = false): Promis
 
 /** A sample of the chosen voice (not saved). */
 export async function previewVoice(text = "This is how your stories will sound."): Promise<Blob> {
-  return speak(key(), { model: voiceModel(), input: text, voice: cfg().voice, speed: cfg().speechSpeed });
+  if (!voiceModel()) throw new Error("No voice model yet: tap Refresh models.");
+  return narrate(text);
 }
 
 /** Turn reference screenshots into a reusable written style description. */

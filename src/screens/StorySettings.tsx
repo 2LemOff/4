@@ -1,14 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { drawModel, previewVoice, styleFromScreenshots, visionModel, voiceModel } from "../stories";
+import { drawModel, previewVoice, styleFromScreenshots, visionModel, voiceModel, voiceName, voicesFor } from "../stories";
 import { LOOKS, STORY_STYLES, type LookId, type StorySettings as Cfg, type StyleId } from "../storyStyles";
-import { modelsStore, settingsStore, updateSettings, useStore } from "../store";
+import { modelsStore, refreshModels, settingsStore, updateSettings, useStore } from "../store";
 import { ModelPicker } from "../components/ModelPicker";
 import { MediaControls } from "../components/MediaControls";
 import { imageSetup, loadEndpoints, loadMediaModels, mediaStore, videoSetup } from "../media";
 import { formatPrice } from "../mediaSettings";
-
-/** Common text-to-speech voice names, offered as suggestions; any name the voice model accepts can be typed. */
-const VOICES = ["alloy", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer", "verse"];
 
 /** Shrink a screenshot to at most 768px wide as JPEG, so the vision request stays small. */
 async function toDataUrl(file: File): Promise<string> {
@@ -23,7 +20,10 @@ async function toDataUrl(file: File): Promise<string> {
 
 export function StorySettings() {
   const { story: s } = useStore(settingsStore);
-  const { speechModels = [] } = useStore(modelsStore);
+  const models = useStore(modelsStore);
+  const speechModels = (models.speechModels ?? []).filter((m) => !m.id.includes(":"));
+  const vModel = voiceModel();
+  const voices = voicesFor(vModel);
   const set = (p: Partial<Cfg>) => updateSettings((x) => ({ story: { ...x.story, ...p } }));
   const [styleId, setStyleId] = useState<StyleId>(s.style);
   const [busy, setBusy] = useState("");
@@ -149,24 +149,37 @@ export function StorySettings() {
       <h2 className="section">Voice</h2>
       <label className="field">
         <span className="field-label">Voice model</span>
-        <input className="input" list="speech-models" value={s.voiceModel} placeholder={voiceModel() || "e.g. openai/gpt-4o-mini-tts"} onChange={(e) => set({ voiceModel: e.target.value.trim() })} aria-label="Voice model" />
-        <datalist id="speech-models">
-          {speechModels.map((m) => <option key={m.id} value={m.id} />)}
-        </datalist>
-        <span className="muted small">{speechModels.length ? `${speechModels.length} speech models available. Empty = ${voiceModel()}.` : "Refresh the model list in Settings › Models to see speech models."}</span>
+        <select className="input" value={s.voiceModel} onChange={(e) => set({ voiceModel: e.target.value })} aria-label="Voice model">
+          <option value="">Automatic ({vModel.split("/").pop() || "none yet"})</option>
+          {speechModels.map((m) => <option key={m.id} value={m.id}>{m.name ?? m.id}</option>)}
+        </select>
+        <span className="muted small">
+          {speechModels.length ? `${speechModels.length} speech models.` : "No speech models loaded yet."}{" "}
+          <button className="btn chip" onClick={() => refreshModels(true)} disabled={models.loading}>{models.loading ? "Loading…" : "Refresh models"}</button>
+        </span>
       </label>
       <label className="field">
         <span className="field-label">Voice</span>
-        <input className="input" list="voices" value={s.voice} onChange={(e) => set({ voice: e.target.value.trim() })} aria-label="Voice" />
-        <datalist id="voices">
-          {VOICES.map((v) => <option key={v} value={v} />)}
-        </datalist>
+        {voices.length ? (
+          <select className="input" value={voiceName(vModel)} onChange={(e) => set({ voice: e.target.value })} aria-label="Voice">
+            {voices.map((v) => <option key={v} value={v}>{v}</option>)}
+          </select>
+        ) : (
+          <input className="input" value={s.voice} onChange={(e) => set({ voice: e.target.value.trim() })} aria-label="Voice" placeholder="Voice name" />
+        )}
+        {!voices.length && <span className="muted small">This model doesn't list its voices; type one it accepts.</span>}
+      </label>
+      <label className="field">
+        <span className="field-label">Narrator style (optional)</span>
+        <input className="input" value={s.narratorStyle} placeholder="e.g. warm and curious, unhurried" onChange={(e) => set({ narratorStyle: e.target.value })} aria-label="Narrator style" />
+        <span className="muted small">Sent as instructions. OpenAI and Gemini voices follow it; other voices ignore it.</span>
       </label>
       <button className="btn sm" disabled={!!busy} onClick={preview}>▶ Preview voice</button>
       <audio ref={player} aria-label="Voice preview" />
       <label className="field">
         <span className="field-label">Speech speed (sent to the voice model): {s.speechSpeed.toFixed(2)}×</span>
         <input type="range" min={0.5} max={2} step={0.05} value={s.speechSpeed} onChange={(e) => set({ speechSpeed: Number(e.target.value) })} aria-label="Speech speed" />
+        {s.noSpeedModels.includes(vModel) && <span className="muted small">This voice model has no speed setting; use the playback speed below.</span>}
       </label>
       <label className="field">
         <span className="field-label">Playback speed</span>
@@ -207,6 +220,7 @@ function MediaSettings() {
       </label>
       <MediaControls controls={img.controls} values={img.values} onChange={(k, v) => set({ imageParams: { ...s.imageParams, [k]: v } })} />
       <p className="small" aria-label="Image price">Estimated cost per image: {formatPrice(img.price)}</p>
+      {img.price && !img.price.unknown && <p className="muted small">Based on {img.price.basis}. A failed image isn't charged.</p>}
       {img.maxRefs > 0 && s.refImages.length > 0 && (
         <label className="check">
           <input type="checkbox" checked={s.useRefs} onChange={(e) => set({ useRefs: e.target.checked })} />
@@ -223,11 +237,20 @@ function MediaSettings() {
         </select>
       </label>
       <MediaControls controls={vid.controls} values={vid.values} onChange={(k, v) => set({ videoParams: { ...s.videoParams, [k]: v } })} />
-      <p className="small" aria-label="Video price">Estimated cost per clip: {formatPrice(vid.price)}</p>
       <label className="check">
         <input type="checkbox" checked={s.videoSound} onChange={(e) => set({ videoSound: e.target.checked })} />
-        <span>Play the video's own sound (otherwise muted under the narration)</span>
+        <span>Clip's own sound (off: a silent clip under the narration)</span>
       </label>
+      <p className="small" aria-label="Video price">Estimated cost per clip: {formatPrice(vid.price)}</p>
+      {vid.price && <p className="muted small">Based on {vid.price.basis}.</p>}
+      {vid.info?.pricing_skus && (
+        <details className="group">
+          <summary className="small">Price details</summary>
+          <ul className="small">
+            {Object.entries(vid.info.pricing_skus).map(([k, v]) => <li key={k}>{k}: ${String(v)}</li>)}
+          </ul>
+        </details>
+      )}
       {media.error && <p className="error small">{media.error} <button className="btn chip" onClick={() => loadMediaModels(true)}>Retry</button></p>}
     </>
   );

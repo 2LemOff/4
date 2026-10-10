@@ -88,10 +88,15 @@ test.describe("Story slides", () => {
     const vision = calls.json.find((b) => JSON.stringify(b).includes("Describe the visual style"))!;
     expect(vision.messages[0].content[1].image_url.url).toMatch(/^data:image\/jpeg/);
 
-    await page.getByLabel("Voice", { exact: true }).fill("nova");
+    // the voice list comes from the speech model's supported_voices; a :batch variant isn't offered
+    await expect(page.getByLabel("Voice model").locator("option")).toHaveText(["Automatic (gpt-4o-mini-tts)", "GPT-4o mini TTS"]);
+    await expect(page.getByLabel("Voice", { exact: true }).locator("option")).toHaveText(["alloy", "nova", "verse"]);
+    await page.getByLabel("Voice", { exact: true }).selectOption("nova");
+    await page.getByLabel("Narrator style").fill("warm and curious");
     await page.getByRole("button", { name: "▶ Preview voice" }).click();
     await expect.poll(() => calls.speech.length).toBe(1);
-    expect(calls.speech[0].voice).toBe("nova");
+    expect(calls.speech[0]).toMatchObject({ voice: "nova", instructions: "warm and curious", response_format: "mp3" });
+    expect(calls.speech[0].speed).toBeUndefined();
 
     // the next story uses the notes; deleting a narration file leaves the text with Regenerate
     await page.goto("/#/");
@@ -126,11 +131,22 @@ test.describe("Story AI pictures", () => {
     // settings built from /images/models and the endpoint record (the endpoint narrows aspect ratios)
     await expect(page.getByLabel("Image model")).toHaveValue("acme/painter-2");
     await expect(page.getByLabel("Aspect ratio").first().locator("option")).toHaveText(["1:1", "4:3"]);
+    // documented pricing lines: the 1K variant line, cost_usd
     await expect(page.getByLabel("Image price")).toHaveText("Estimated cost per image: about $0.04");
+    await page.getByLabel("Resolution").first().selectOption("2K");
+    await expect(page.getByLabel("Image price")).toHaveText("Estimated cost per image: about $0.08");
+    await page.getByLabel("Resolution").first().selectOption("1K");
     await expect(page.getByLabel("Video model")).toHaveValue("acme/film-1");
+    // starts at the duration closest to 5 s; size isn't offered next to resolution and aspect ratio
+    await expect(page.getByLabel("Duration (seconds)")).toHaveValue("4");
+    await expect(page.getByLabel("Size")).toHaveCount(0);
+    await expect(page.getByLabel("Video price")).toHaveText("Estimated cost per clip: about $0.80");
     await page.getByLabel("Duration (seconds)").selectOption("8");
-    await page.getByLabel("Generate sound").check();
+    await page.getByLabel(/Clip's own sound/).check();
     await expect(page.getByLabel("Video price")).toHaveText("Estimated cost per clip: about $3.20");
+    await expect(page.getByText("Based on per-video-second × 8 s.")).toBeVisible();
+    await page.getByText("Price details").click();
+    await expect(page.getByText("per-video-second-no-audio: $0.20")).toBeVisible();
     await page.getByLabel("Duration (seconds)").selectOption("4");
 
     await page.goto("/#/");
@@ -162,6 +178,9 @@ test.describe("Story AI pictures", () => {
     await page.reload();
     await expect(page.locator(".story-pic video")).toBeVisible({ timeout: 15000 });
     expect(calls.polls).toBeGreaterThanOrEqual(2);
+    // the clip was downloaded with the key (the links aren't presigned) and its cost saved
+    expect(calls.downloads).toEqual(["Bearer sk-or-test"]);
+    await expect(page.getByText(/picture cost \$1\.60/)).toBeVisible();
 
     await page.goto("/#/settings/storage");
     await expect(page.getByText(/image 1/)).toBeVisible();

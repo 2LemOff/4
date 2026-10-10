@@ -77,10 +77,10 @@ Each member's answer has **Continue with this model**, which switches the counci
   The rules for every style can be edited. **Add screenshots** of frames you like, and a vision model writes a style description for that style.
 - **Pictures:**
   - **Shapes drawn by AI** (default): a small SVG in a chosen look (colorful flat vectors, line art, diagrams on dark, isometric, paper cut-out, chalkboard, or your own). It is sanitized and shown only as an image.
-  - **AI image** per slide or for every slide. Models and settings come from OpenRouter's `/images/models` and each model's endpoint record, with an estimated price per image.
-  - **AI video**, opt-in per slide. Models, durations, resolutions, aspect ratios and sound come from `/videos/models`, and the price from `pricing_skus` is shown before you confirm. Jobs keep going if you leave, and resume after a restart.
+  - **AI image** per slide or for every slide. Models and settings come from OpenRouter's `/images/models` and each model's endpoint record. The estimated price comes from the endpoint's pricing lines: per image or per megapixel (from the resolution tier), the line for the chosen resolution, plus reference images when sent; token-priced models say "known when done". A failed image isn't charged.
+  - **AI video**, opt-in per slide. Models, durations, resolutions and aspect ratios come from `/videos/models` (never a size next to them); a clip starts at the duration closest to 5 seconds. **Clip's own sound** is off by default (the narration plays anyway). The price from `pricing_skus` is shown before you confirm, with the SKU it's based on and a **Price details** list. Clips are downloaded with your key (the links aren't public), kept on the phone, and their cost is saved. Jobs are checked about every 30 seconds, keep going if you leave, and resume after a restart.
 - **Voice:**
-  - an AI voice model with a voice picker, **▶ Preview** and speech speed
+  - an AI voice model from OpenRouter's speech models, with that model's own voices (`supported_voices`), **▶ Preview**, an optional **narrator style** (followed by OpenAI and Gemini voices) and speech speed (left out for models without it)
   - playback speed from 0.75× to 2× in the player
   - autoplay to the next slide
 - **Player:**

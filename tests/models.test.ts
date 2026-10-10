@@ -39,6 +39,13 @@ describe("models", () => {
     const d = roleDefaults([m("meta/x", 5)]);
     expect(d.answer).toBe("meta/x");
   });
+  it("never picks a :batch, :free or other variant as a default (the drawing model bug)", () => {
+    const withVariants = [...list, m("anthropic/claude-sonnet-5.5:batch", 999), m("google/gemini-3.6-flash:free", 999), m("google/gemini-3.5-pro:nitro", 999)];
+    expect(newestOf(withVariants, "claude-sonnet")?.id).toBe("anthropic/claude-sonnet-5.5");
+    expect(newestOf(withVariants, "gemini-flash")?.id).toBe("google/gemini-3.6-flash");
+    expect(roleDefaults(withVariants).answer).toBe("google/gemini-3.5-pro");
+    expect(roleDefaults([m("meta/x:batch", 9), m("meta/x", 5)]).answer).toBe("meta/x");
+  });
   it("skips models that do not output text", () => {
     expect(familyModels([m("google/gemini-3-pro", 9, { architecture: { output_modalities: ["image"] } })], "gemini-pro")).toEqual([]);
   });

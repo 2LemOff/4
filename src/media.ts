@@ -1,12 +1,13 @@
 import { db, uid } from "./db";
 import { createStore, settingsStore, updateSettings } from "./store";
-import { generateImage, getVideo, imageModelEndpoints, listImageModels, listVideoModels, OpenRouterError, submitVideo, type VideoJob } from "./openrouter";
+import { downloadVideo, generateImage, getVideo, imageModelEndpoints, listImageModels, listVideoModels, OpenRouterError, submitVideo, type VideoJob } from "./openrouter";
 import {
   defaultsFor,
   estimateImagePrice,
   estimateVideoPrice,
   imageControls,
   maxReferences,
+  preferredDuration,
   requestParams,
   supportedFromError,
   videoControls,
@@ -83,26 +84,27 @@ export function imageSetup(model = imageModel()): { model: string; controls: Med
   const ep = st.endpoints[model]?.[0];
   const controls = imageControls(m?.supported_parameters, ep?.supported_parameters);
   const values = defaultsFor(controls, cfg().imageParams, { aspect_ratio: "4:3", resolution: "1K" });
+  const maxRefs = maxReferences(ep?.supported_parameters ?? m?.supported_parameters);
+  const refs = cfg().useRefs ? Math.min(cfg().refImages.length, maxRefs) : 0;
   return {
     model,
     controls,
     values,
-    price: estimateImagePrice(ep?.pricing ?? (m as Record<string, unknown> | undefined)?.pricing, values),
-    maxRefs: maxReferences(ep?.supported_parameters ?? m?.supported_parameters),
+    price: estimateImagePrice(ep?.pricing ?? (m as Record<string, unknown> | undefined)?.pricing, values, refs),
+    maxRefs,
   };
 }
 
 export function videoSetup(model = videoModel()): { model: string; info?: VideoModel; controls: MediaControl[]; values: Record<string, unknown>; price?: PriceRange } {
   const info = mediaStore.get().videoModels.find((x) => x.id === model);
   const controls = info ? videoControls(info) : [];
-  const durations = info?.supported_durations ?? [];
-  const values = defaultsFor(controls, cfg().videoParams, { aspect_ratio: "4:3", duration: durations.length ? Math.min(...durations) : undefined });
+  const values = defaultsFor(controls, cfg().videoParams, { aspect_ratio: "4:3", duration: preferredDuration(info?.supported_durations) });
   return {
     model,
     info,
     controls,
     values,
-    price: estimateVideoPrice(info?.pricing_skus, { duration: values.duration as number, resolution: values.resolution as string, audio: values.generate_audio as boolean | undefined }),
+    price: estimateVideoPrice(info?.pricing_skus, { duration: values.duration as number, resolution: values.resolution as string, audio: cfg().videoSound }),
   };
 }
 
@@ -157,18 +159,18 @@ export async function imageSlide(id: string, i: number, force = false): Promise<
     const { model, controls, values, maxRefs } = imageSetup(setup.model);
     const body: Record<string, unknown> = { model, prompt: scenePrompt(slide, st.style), ...requestParams(controls, values) };
     const refs = cfg().useRefs ? cfg().refImages.slice(0, maxRefs) : [];
-    let blob: Blob;
+    let made: { blob: Blob; cost?: number };
     try {
-      blob = await generateImage(key(), refs.length ? { ...body, input_references: refs.map((url) => ({ type: "image_url", image_url: { url } })) } : body);
+      made = await generateImage(key(), refs.length ? { ...body, input_references: refs.map((url) => ({ type: "image_url", image_url: { url } })) } : body);
     } catch (e) {
       if (!refs.length || !(e instanceof OpenRouterError) || e.status !== 400) throw e;
-      blob = await generateImage(key(), body); // the references were refused: try without them
+      made = await generateImage(key(), body); // the references were refused: try without them
     }
-    blob = await compact(blob);
+    const blob = await compact(made.blob);
     const mediaId = uid();
     await db.media.put({ id: mediaId, sessionId: st.sessionId, storyId: id, kind: "image", mime: blob.type, size: blob.size, label: `${st.title || "Story"} · image ${i + 1}`, blob, createdAt: Date.now() });
     if (slide.imageId) await db.media.delete(slide.imageId);
-    await patchSlide(id, i, { imageId: mediaId, pictureStatus: "done" });
+    await patchSlide(id, i, { imageId: mediaId, pictureStatus: "done", pictureCost: made.cost });
   } catch (e) {
     await patchSlide(id, i, { pictureStatus: "error", pictureError: message(e) });
   }
@@ -184,9 +186,17 @@ export async function videoSlide(id: string, i: number): Promise<void> {
     await loadMediaModels();
     const { model, controls, values } = videoSetup();
     if (!model) throw new Error("Choose a video model in Settings › Story.");
+    // the narration plays over the clip, so its own sound is only asked for when wanted (it defaults to on)
+    const body = { model, prompt: `${scenePrompt(slide, st.style)} Gentle camera movement.`, ...requestParams(controls, values), generate_audio: cfg().videoSound };
     let job: VideoJob;
     try {
-      job = await submitVideo(key(), { model, prompt: `${scenePrompt(slide, st.style)} Gentle camera movement.`, ...requestParams(controls, values) });
+      try {
+        job = await submitVideo(key(), body);
+      } catch (e) {
+        if (!(e instanceof OpenRouterError) || e.status !== 400 || !/generate_audio|audio/i.test(e.message)) throw e;
+        const { generate_audio: _drop, ...rest } = body;
+        job = await submitVideo(key(), rest); // a model without sound settings
+      }
     } catch (e) {
       const fix = e instanceof OpenRouterError && e.status === 400 ? supportedFromError(e.message) : undefined;
       if (fix) {
@@ -203,10 +213,11 @@ export async function videoSlide(id: string, i: number): Promise<void> {
   }
 }
 
-export const VIDEO_POLL_MS = 5000;
+/** OpenRouter suggests polling about every 30 seconds; a clip usually takes from 30 seconds to a few minutes. */
+export const VIDEO_POLL_MS = 30_000;
 const polling = new Set<string>();
 
-/** Poll a video job every 5 seconds until it finishes, then save the clip. Resumes after a restart. */
+/** Poll a video job until it finishes, then save the clip. Resumes after a restart. */
 export async function pollVideo(id: string, i: number): Promise<void> {
   const k = `${id}:${i}`;
   if (polling.has(k)) return;
@@ -237,7 +248,7 @@ export async function pollVideo(id: string, i: number): Promise<void> {
       }
       const url = res.unsigned_urls?.[0];
       if (!url) throw new Error("The video finished but no download link came back.");
-      await saveClip(id, i, url);
+      await saveClip(id, i, url, res.usage?.cost);
       return;
     }
   } catch (e) {
@@ -247,21 +258,31 @@ export async function pollVideo(id: string, i: number): Promise<void> {
   }
 }
 
-async function saveClip(id: string, i: number, url: string) {
+/**
+ * Download the finished clip with the API key (the links aren't presigned) and save it on the phone. If the
+ * download fails the job is kept, so the next start (or Regenerate) tries the download again.
+ */
+async function saveClip(id: string, i: number, url: string, cost?: number) {
   const st = (await db.stories.get(id))!;
   const slide = st.slides[i];
-  try {
-    const r = await fetch(url);
-    if (!r.ok) throw new Error(String(r.status));
-    const blob = await r.blob();
-    const mediaId = uid();
-    await db.media.put({ id: mediaId, sessionId: st.sessionId, storyId: id, kind: "video", mime: blob.type || "video/mp4", size: blob.size, label: `${st.title || "Story"} · video ${i + 1}`, blob, createdAt: Date.now() });
-    if (slide.videoId) await db.media.delete(slide.videoId);
-    await patchSlide(id, i, { videoId: mediaId, videoUrl: undefined, videoJob: undefined, pictureStatus: "done" });
-  } catch {
-    // the download was blocked (e.g. CORS): keep the link so it can still play
-    await patchSlide(id, i, { videoUrl: url, videoJob: undefined, pictureStatus: "done" });
+  let blob: Blob | undefined;
+  let why = "";
+  for (let attempt = 0; attempt < 3 && !blob; attempt++) {
+    try {
+      blob = await downloadVideo(key(), url);
+    } catch (e) {
+      why = message(e);
+      if (attempt < 2) await new Promise((r) => setTimeout(r, 4000));
+    }
   }
+  if (!blob) {
+    await patchSlide(id, i, { videoJob: slide.videoJob && { ...slide.videoJob, status: "completed" }, pictureStatus: "error", pictureError: `The video is ready but couldn't be downloaded (${why}).` });
+    return;
+  }
+  const mediaId = uid();
+  await db.media.put({ id: mediaId, sessionId: st.sessionId, storyId: id, kind: "video", mime: blob.type || "video/mp4", size: blob.size, label: `${st.title || "Story"} · video ${i + 1}`, blob, createdAt: Date.now() });
+  if (slide.videoId) await db.media.delete(slide.videoId);
+  await patchSlide(id, i, { videoId: mediaId, videoUrl: undefined, videoJob: undefined, pictureStatus: "done", pictureCost: cost });
 }
 
 export async function resumeVideos(): Promise<void> {

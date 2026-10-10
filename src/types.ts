@@ -17,7 +17,9 @@ export interface ModelInfo {
   pricing?: { prompt?: string; completion?: string };
   supported_parameters?: string[];
   reasoning?: ModelReasoningInfo;
-  architecture?: { output_modalities?: string[] };
+  architecture?: { output_modalities?: string[]; input_modalities?: string[] };
+  /** speech models: the voices this model accepts */
+  supported_voices?: string[];
 }
 
 export interface ReasoningSettings {

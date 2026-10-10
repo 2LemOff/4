@@ -259,10 +259,14 @@ export async function embed(apiKey: string, model: string, input: string[]): Pro
 
 // ── Speech, vision ───────────────────────────────────────────────────────────
 
-/** Text to speech: POST /audio/speech returns raw audio bytes. */
-export async function speak(apiKey: string, opts: { model: string; input: string; voice: string; speed?: number }): Promise<Blob> {
+/**
+ * Text to speech: POST /audio/speech returns raw audio bytes. Always mp3 (the API's default is pcm);
+ * `speed` only when it isn't 1 (some models reject it); `instructions` (narrator style) where given.
+ */
+export async function speak(apiKey: string, opts: { model: string; input: string; voice: string; speed?: number; instructions?: string }): Promise<Blob> {
   const body: Record<string, unknown> = { model: opts.model, input: opts.input, voice: opts.voice, response_format: "mp3" };
   if (opts.speed && opts.speed !== 1) body.speed = opts.speed;
+  if (opts.instructions?.trim()) body.instructions = opts.instructions.trim();
   const res = await fetch(`${API}/audio/speech`, { method: "POST", headers: headers(apiKey), body: JSON.stringify(body) });
   if (!res.ok) throw await failure(res);
   const blob = await res.blob();
@@ -337,22 +341,27 @@ export async function imageModelEndpoints(model: string): Promise<{ supported_pa
   return Array.isArray(d) ? d : d.endpoints ?? [];
 }
 
-/** POST /images; the buffered result is data[0].b64_json (or a url). */
-export async function generateImage(apiKey: string, body: Record<string, unknown>): Promise<Blob> {
+/**
+ * POST /images: the result is data[0].b64_json with its `media_type` (PNG, JPEG, WebP or SVG), and
+ * usage.cost. A failed generation returns 502 and isn't billed, so trying again is safe.
+ */
+export async function generateImage(apiKey: string, body: Record<string, unknown>): Promise<{ blob: Blob; cost?: number }> {
   const res = await fetch(`${API}/images`, { method: "POST", headers: headers(apiKey), body: JSON.stringify(body) });
   if (!res.ok) throw await failure(res);
   const j = await res.json();
   const first = j.data?.[0] ?? {};
+  const cost = typeof j.usage?.cost === "number" ? j.usage.cost : undefined;
   if (first.b64_json) {
     const bin = atob(first.b64_json);
     const bytes = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    return new Blob([bytes], { type: first.mime_type ?? (bin.startsWith("<svg") || bin.startsWith("<?xml") ? "image/svg+xml" : "image/png") });
+    const looksSvg = bin.startsWith("<svg") || bin.startsWith("<?xml");
+    return { blob: new Blob([bytes], { type: first.media_type ?? first.mime_type ?? (looksSvg ? "image/svg+xml" : "image/png") }), cost };
   }
   if (first.url) {
     const r = await fetch(first.url);
     if (!r.ok) throw new OpenRouterError("The image couldn't be downloaded.", r.status);
-    return r.blob();
+    return { blob: await r.blob(), cost };
   }
   throw new OpenRouterError("No image came back.", 500);
 }
@@ -376,6 +385,15 @@ export async function submitVideo(apiKey: string, body: Record<string, unknown>)
   const res = await fetch(`${API}/videos`, { method: "POST", headers: headers(apiKey), body: JSON.stringify(body) });
   if (!res.ok) throw await failure(res);
   return res.json();
+}
+
+/** The finished clip. The links aren't presigned: they need the same Authorization header as polling. */
+export async function downloadVideo(apiKey: string, url: string): Promise<Blob> {
+  // the key only ever goes to openrouter.ai
+  const ours = new URL(url, API).hostname.endsWith("openrouter.ai");
+  const res = await fetch(url, ours ? { headers: { Authorization: `Bearer ${apiKey}` } } : undefined);
+  if (!res.ok) throw await failure(res);
+  return res.blob();
 }
 
 export async function getVideo(apiKey: string, id: string): Promise<VideoJob> {

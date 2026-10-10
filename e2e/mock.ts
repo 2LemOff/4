@@ -44,7 +44,10 @@ export const MODELS = [
     reasoning: { supported_efforts: ["xhigh", "high", "medium", "low", "none"], default_effort: "medium", default_enabled: true },
   },
 ];
-const SPEECH_MODELS = [{ id: "openai/gpt-4o-mini-tts", created: 2, architecture: { output_modalities: ["speech"] } }];
+const SPEECH_MODELS = [
+  { id: "openai/gpt-4o-mini-tts", name: "GPT-4o mini TTS", created: 2, architecture: { output_modalities: ["speech"] }, supported_voices: ["alloy", "nova", "verse"] },
+  { id: "openai/gpt-4o-mini-tts:batch", created: 9, architecture: { output_modalities: ["speech"] } },
+];
 /** A tiny SVG per scene, with a script and handler the app must strip. */
 export const SCENE_SVG = '<svg viewBox="0 0 400 300"><script>alert(1)</script><rect width="400" height="300" fill="#fde" onclick="x()"/><circle cx="200" cy="150" r="60" fill="#36c"/></svg>';
 export const IMAGE_MODELS = [
@@ -58,17 +61,29 @@ export const IMAGE_MODELS = [
     },
   },
 ];
+/** The documented per-endpoint record: typed descriptors and billable pricing lines. */
 export const IMAGE_ENDPOINTS = {
-  data: {
-    id: "acme/painter-2",
-    endpoints: [{ provider_name: "Acme", supported_parameters: { aspect_ratio: { type: "enum", values: ["1:1", "4:3"] }, resolution: { type: "enum", values: ["1K", "2K"] }, input_references: { type: "range", min: 0, max: 4 } }, pricing: { image: "0.04" } }],
-  },
+  id: "acme/painter-2",
+  endpoints: [
+    {
+      provider_name: "Acme",
+      provider_slug: "acme",
+      provider_tag: "acme",
+      supported_parameters: { aspect_ratio: { type: "enum", values: ["1:1", "4:3"] }, resolution: { type: "enum", values: ["1K", "2K"] }, input_references: { type: "range", min: 0, max: 4 } },
+      allowed_passthrough_parameters: [],
+      supports_streaming: false,
+      pricing: [
+        { billable: "output_image", unit: "image", cost_usd: 0.04, variant: "1k" },
+        { billable: "output_image", unit: "image", cost_usd: 0.08, variant: "2k" },
+        { billable: "input_reference", unit: "image", cost_usd: 0.01 },
+      ],
+    },
+  ],
 };
 export const VIDEO_MODELS = [
   {
     id: "acme/film-1", name: "Film 1", created: 6,
-    supported_durations: [4, 8], supported_resolutions: ["720p", "1080p"], supported_aspect_ratios: ["16:9", "4:3"], supported_sizes: null,
-    generate_audio: true,
+    supported_durations: [4, 8], supported_resolutions: ["720p", "1080p"], supported_aspect_ratios: ["16:9", "4:3"], supported_sizes: ["1280x720"],
     pricing_skus: { "per-video-second": "0.40", "per-video-second-1080p": "0.60", "per-video-second-no-audio": "0.20" },
   },
 ];
@@ -104,6 +119,8 @@ export interface Calls {
   images: any[];
   videos: any[];
   polls: number;
+  /** Authorization header of each clip download */
+  downloads: (string | undefined)[];
 }
 
 /** A pyramid answer in the app's JSON format, using the id prefix the app sends. Later answers build on K1.n2. */
@@ -129,7 +146,7 @@ export function pyramidAnswer(prefix: string): string {
 const ANSWER = "Premise one is simple.\n\nPremise two depends on it. It has a second sentence about observers.\n\nPremise three concludes.";
 
 export async function mockOpenRouter(page: Page, opts: MockOptions = {}): Promise<Calls> {
-  const calls: Calls = { chat: [], stream: [], json: [], embeddings: [], speech: [], images: [], videos: [], polls: 0 };
+  const calls: Calls = { chat: [], stream: [], json: [], embeddings: [], speech: [], images: [], videos: [], polls: 0, downloads: [] };
   let n = 0;
   await page.route(/https:\/\/openrouter\.ai\/api\/v1\/.*/, async (route: Route) => {
     const req = route.request();
@@ -150,17 +167,27 @@ export async function mockOpenRouter(page: Page, opts: MockOptions = {}): Promis
     if (/\/images\/models\/.+\/endpoints$/.test(url.pathname)) return json(IMAGE_ENDPOINTS);
     if (url.pathname.endsWith("/images")) {
       calls.images.push(req.postDataJSON());
-      return json({ data: [{ b64_json: PNG_B64 }] });
+      return json({ created: 1, data: [{ b64_json: PNG_B64, media_type: "image/png" }], usage: { cost: 0.04 } });
     }
     if (url.pathname.endsWith("/videos/models")) return json({ data: VIDEO_MODELS });
     if (url.pathname.endsWith("/videos") && req.method() === "POST") {
       calls.videos.push(req.postDataJSON());
       return json({ id: "vid-1", status: "pending", polling_url: "https://openrouter.ai/api/v1/videos/vid-1" });
     }
-    if (url.pathname.endsWith("/videos/vid-1/content")) return route.fulfill({ status: 200, headers: { ...CORS, "content-type": "video/mp4" }, body: Buffer.from([0, 0, 0, 24, 102, 116, 121, 112]) });
+    if (url.pathname.endsWith("/videos/vid-1/content")) {
+      // like the real API: the link isn't presigned, so the key is required
+      const auth = req.headers()["authorization"];
+      calls.downloads.push(auth);
+      if (auth !== "Bearer sk-or-test") return route.fulfill({ status: 401, headers: { ...CORS, "content-type": "application/json" }, body: JSON.stringify({ error: { message: "Missing authentication" } }) });
+      return route.fulfill({ status: 200, headers: { ...CORS, "content-type": "video/mp4" }, body: Buffer.from([0, 0, 0, 24, 102, 116, 121, 112]) });
+    }
     if (url.pathname.endsWith("/videos/vid-1")) {
       calls.polls++;
-      return json(calls.polls < 2 ? { id: "vid-1", status: "in_progress" } : { id: "vid-1", status: "completed", unsigned_urls: ["https://openrouter.ai/api/v1/videos/vid-1/content"] });
+      return json(
+        calls.polls < 2
+          ? { id: "vid-1", status: "in_progress" }
+          : { id: "vid-1", generation_id: "gen-v1", status: "completed", unsigned_urls: ["https://openrouter.ai/api/v1/videos/vid-1/content?index=0"], usage: { cost: 1.6, is_byok: false } },
+      );
     }
     if (url.pathname.endsWith("/audio/speech")) {
       calls.speech.push(req.postDataJSON());
