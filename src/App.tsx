@@ -24,7 +24,7 @@ export function App() {
     <div className="app">
       <div className="view">
         {r.name === "home" && <Home />}
-        {r.name === "chat" && <ChatScreen key={r.sid} sid={r.sid} focus={r.focus} find={r.find} quote={r.quote} ask={r.ask} />}
+        {r.name === "chat" && <ChatScreen key={r.sid} sid={r.sid} focus={r.focus} find={r.find} quote={r.quote} ask={r.ask} branch={r.branch} />}
         {r.name === "visual" && <VisualScreen key={r.id} id={r.id} view={r.view} />}
         {r.name === "map" && <MapScreen key={r.sid} sid={r.sid} focus={r.focus} node={r.node} hl={r.hl} view={r.view} quote={r.quote} />}
         {r.name === "story" && <StoryScreen key={r.id} id={r.id} />}

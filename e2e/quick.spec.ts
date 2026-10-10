@@ -43,7 +43,9 @@ test.describe("quick answers and checks", () => {
     // make it a branch: real questions and answers under the first answer
     await page.getByRole("region", { name: "Quick answer" }).getByRole("button", { name: /Quick/ }).click();
     await page.getByRole("dialog", { name: "Quick answer" }).getByRole("button", { name: "Make it a branch" }).click();
-    await expect(page.locator(".msg-user .bubble")).toHaveText(["Why is the sky blue?", "Explain this", "Why?"]);
+    // it opens beside the original, which keeps its own questions
+    await expect(page.locator(".branch-pane .msg-user .bubble")).toHaveText(["Explain this", "Why?"]);
+    await expect(page.locator(".chat > .thread .msg-user .bubble")).toHaveText(["Why is the sky blue?", "Next question"]);
     await expect(page.locator(".msg-user .quote-line")).toHaveText("depends on it");
     await expect(page.getByRole("region", { name: "Quick answer" })).toHaveCount(0);
   });

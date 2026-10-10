@@ -23,9 +23,8 @@ Mobile only. Runs in the phone browser (installable PWA). Everything stays on yo
 
    My question: …
    ```
-5. Asking about highlights starts a **branch** under the answer they came from (with highlights in several answers, under the latest of them). Then:
-   - a highlight shows **↳ n**, the number of questions asked about it; tap it to see them, add it to the tray again, or delete it
-   - your message shows **‹ 1/2 ›** when an answer has several follow-ups
+5. Asking about highlights starts a **branch** under the answer they came from (with highlights in several answers, under the latest of them), opened **beside the original** (below). Then:
+   - a highlight shows its branch numbers (① ②); tap it to see them, add it to the tray again, or delete it
    - the title (top bar) opens the **Branches** list of the whole tree
 6. **✦ Synthesize** (in ⋯) compiles the whole tree into a **Concept Outline** in the **Library**.
 
@@ -36,6 +35,19 @@ Mobile only. Runs in the phone browser (installable PWA). Everything stays on yo
 - a one-line question box with the quick questions (?), the council, the model settings and a round send button
 - the selection bar and the tray appear only while they're needed
 - no tab bar inside a topic
+
+## Asking beside the original
+
+When you **Ask** about highlighted words, the branch opens **next to the original, which doesn't move**: the paragraph you asked about stays exactly where it was on screen. The branch's request is the whole conversation up to that answer, then your question quoting the words.
+
+Three ways to show it, one tap apart in the branch's bar (the default is in Settings › Models › Answers):
+- **Split:** the divider goes just under the paragraph you asked about. ⤢ gives the branch, then the original, the whole screen. In landscape the split is left | right.
+- **Bubble:** a floating window over the original. Drag ⠿ to move it and the corner to resize it; buttons cycle S / M / L and snap it to the top or bottom; – shrinks it to ① at the edge. Position and size are remembered.
+- **Layer:** the branch covers the screen; ⇅ drops it to a slim bar so you can use the original, and the bar brings it back. ◐ makes it see-through (solid / 70% / 40%); hold ◐ to see the original clearly.
+
+**Follow-ups:** a switch above the question box chooses **Same thread** (the follow-up continues the branch and sees it) or **New branch** (it starts another branch from the same words and sees only the original and the quote). Highlights show the numbers of their branches (① ②); tabs switch between the branches of what's above. Words in a branch's answer can be asked about too: that branch moves up as the source (breadcrumb Main › ① › 1.1, ‹ Up). ✕ or Android Back returns you to the exact spot, and every line keeps its own scroll position.
+
+**The keyboard doesn't push the page:** the app gets shorter above it instead (`interactive-widget=resizes-content`, with a fallback that follows the visible area). While you type in the split, the branch folds to its bar so the original keeps its place; if the keyboard would cover the words you're asking about, the original scrolls just enough and comes back when the keyboard closes. Settings has an overlay option to try (the keyboard covers the screen and only the question box rises), and **hold-to-speak** asks without a keyboard at all.
 
 ## Quick answers and checks
 

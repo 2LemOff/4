@@ -10,6 +10,7 @@ import { challengeS256, authUrl, makeVerifier } from "../openrouter";
 import { ANSWER_FORMAT, composeSystemPrompt, DEFAULT_SYSTEM_PROMPT, detectToggles, PROMPT_PARTS, setToggle } from "../prompts";
 import { go } from "../route";
 import { modelsStore, refreshModels, settingsStore, updateSettings, useLive, useStore } from "../store";
+import type { AppSettings } from "../store";
 import type { PromptToggles } from "../types";
 
 const SECTIONS = [
@@ -103,7 +104,36 @@ function Models() {
       </p>
       <TaskList
         extras={{
-          answer: <PromptSettings embedded />,
+          answer: (
+            <>
+              <PromptSettings embedded />
+              <fieldset className="field">
+                <legend className="small">When you ask about highlighted words</legend>
+                <label className="small">
+                  The branch opens as{" "}
+                  <select className="input" value={s.branchMode} onChange={(e) => updateSettings({ branchMode: e.target.value as AppSettings["branchMode"] })} aria-label="The branch opens as">
+                    <option value="split">a split screen</option>
+                    <option value="bubble">a bubble you can move</option>
+                    <option value="layer">a layer over the original</option>
+                  </select>
+                </label>
+                <label className="small">
+                  Follow-ups in a branch{" "}
+                  <select className="input" value={s.followUp} onChange={(e) => updateSettings({ followUp: e.target.value as AppSettings["followUp"] })} aria-label="Follow-ups in a branch">
+                    <option value="thread">continue the same thread</option>
+                    <option value="branch">each start a new branch from the same words</option>
+                  </select>
+                </label>
+                <label className="small">
+                  Keyboard{" "}
+                  <select className="input" value={s.keyboardMode} onChange={(e) => updateSettings({ keyboardMode: e.target.value as AppSettings["keyboardMode"] })} aria-label="Keyboard">
+                    <option value="resize">the screen gets shorter above it (nothing slides)</option>
+                    <option value="overlay">it covers the screen; only the question box rises (try on your phone)</option>
+                  </select>
+                </label>
+              </fieldset>
+            </>
+          ),
           quick: (
             <label className="check">
               <input type="checkbox" checked={s.quickAutoCheck} onChange={(e) => updateSettings({ quickAutoCheck: e.target.checked })} />

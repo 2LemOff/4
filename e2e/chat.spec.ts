@@ -65,9 +65,10 @@ test.describe("classic chat", () => {
     expect(second.messages[2].role).toBe("assistant");
     expect(second.messages[2].content).toContain("Premise three concludes.");
 
+    // the branch opens beside the original: both answers are on screen
     await expect(answers(page)).toHaveCount(2);
-    await expect(page.locator(".msg-user .quote-line")).toHaveText("depends on it");
-    await expect(page.locator('mark.hl[data-n="↳ 1"]')).toHaveText("depends on it");
+    await expect(page.locator(".branch-pane .msg-user .quote-line")).toHaveText("depends on it");
+    await expect(page.locator('mark.hl[data-n="①"]')).toHaveText("depends on it");
     await expect(tray(page)).toHaveCount(0);
 
     // tapping the mark shows the question asked about it
@@ -100,21 +101,20 @@ test.describe("classic chat", () => {
     // asked under the later of the two answers, so both are in the history
     expect(third.messages.map((m: any) => m.role)).toEqual(["system", "user", "assistant", "user", "assistant", "user"]);
     await expect(answers(page)).toHaveCount(3);
-    await expect(page.locator('mark.hl[data-n="↳ 1"]')).toHaveCount(2);
+    await expect(page.locator('mark.hl[data-n="①"]')).toHaveCount(2);
 
-    // a highlight in the first answer starts a new branch there
+    // a highlight in the first answer starts a second branch there; tabs switch between them
     await selectWords(page, 0, "Premise three concludes.");
     await bar(page).getByRole("button", { name: "Ask" }).click();
     await askDock(page, "Branch question");
     await expect.poll(() => calls.stream.length).toBe(4);
     expect(calls.stream[3].messages.map((m: any) => m.role)).toEqual(["system", "user", "assistant", "user"]);
-    await expect(answers(page)).toHaveCount(2);
-    await expect(page.locator(".msg-user .bubble").last()).toHaveText("Branch question");
-    await expect(page.locator(".chat-title")).toContainText("Premise three concludes.");
-    const sibs = page.getByRole("group", { name: "Other questions asked here" });
-    await expect(sibs).toContainText("2/2");
-    await sibs.getByRole("button", { name: "Previous branch" }).click();
-    await expect(page.locator(".msg-user .bubble")).toHaveText(["Why is the sky blue?", "Second question", "How do these connect?"]);
+    await expect(page.locator(".branch-pane .msg-user .bubble")).toHaveText(["Branch question"]);
+    await expect(page.locator(".chat > .thread .msg-user .bubble")).toHaveText(["Why is the sky blue?", "Second question"]);
+    const tabs = page.getByRole("tablist", { name: "Branches" });
+    await expect(tabs.getByRole("tab")).toHaveCount(2);
+    await tabs.getByRole("tab", { name: /①/ }).click();
+    await expect(page.locator(".branch-pane .msg-user .bubble")).toHaveText(["How do these connect?"]);
 
     // the Branches sheet lists the whole tree and opens any question
     await page.locator(".chat-title").click();
@@ -122,7 +122,12 @@ test.describe("classic chat", () => {
     await expect(branches.getByRole("button")).toHaveCount(5);
     await expect(branches.locator('[aria-current="true"]')).toHaveCount(3);
     await branches.getByRole("button", { name: /Branch question/ }).click();
-    await expect(page.locator(".msg-user .bubble")).toHaveText(["Why is the sky blue?", "Branch question"]);
+    await expect(page.locator(".branch-pane .msg-user .bubble")).toHaveText(["Branch question"]);
+
+    // closing the branch leaves the original as it was
+    await page.getByRole("button", { name: "Close the branch" }).click();
+    await expect(page.locator(".branch-pane")).toHaveCount(0);
+    await expect(page.locator(".msg-user .bubble")).toHaveText(["Why is the sky blue?", "Second question"]);
   });
 
   test("search opens the chat at the matching answer and marks the words", async ({ page }) => {

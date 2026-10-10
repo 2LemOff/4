@@ -67,6 +67,66 @@ export function treeRows(idx: CardIndex): { card: Card; depth: number }[] {
   return out;
 }
 
+// ── Lines: the main chat and the branches started from highlighted words ──────────
+
+/** A card that starts a branch: its question is about highlighted (quoted) words. */
+export const startsBranch = (c: Card) => c.anchor?.scope === "highlights" && !!c.parentId;
+
+/** The first card of the line `id` belongs to: the branch start above it, or the topic's root. */
+export function lineRoot(idx: CardIndex, id: string): string {
+  let cur = idx.get(id);
+  const seen = new Set<string>();
+  while (cur && !seen.has(cur.id)) {
+    seen.add(cur.id);
+    if (startsBranch(cur) || !cur.parentId || !idx.has(cur.parentId)) return cur.id;
+    cur = idx.get(cur.parentId);
+  }
+  return id;
+}
+
+/**
+ * The cards of one line, from its first card down, following questions asked without highlights. It passes
+ * through `prefer` when that card is on the line, and otherwise takes the newest question at each step.
+ */
+export function linePath(idx: CardIndex, root: string, prefer?: string): Card[] {
+  const out: Card[] = [];
+  let cur = idx.get(root);
+  if (!cur) return out;
+  const via = prefer && idx.has(prefer) && lineRoot(idx, prefer) === root ? new Set(pathToRoot(idx, prefer).map((c) => c.id)) : undefined;
+  const seen = new Set<string>();
+  while (cur && !seen.has(cur.id)) {
+    seen.add(cur.id);
+    out.push(cur);
+    const next: Card[] = children(idx, cur.id).filter((c) => !startsBranch(c));
+    cur = next.find((c) => via?.has(c.id)) ?? next[next.length - 1];
+  }
+  return out;
+}
+
+/** Branches started from a line's cards, oldest first (their position + 1 is their number ①, ②…). */
+export function lineBranches(idx: CardIndex, line: Card[]): Card[] {
+  const ids = new Set(line.map((c) => c.id));
+  return [...idx.values()].filter((c) => startsBranch(c) && ids.has(c.parentId!)).sort((a, b) => a.createdAt - b.createdAt);
+}
+
+/** The line a branch hangs from (its source), or undefined for the main line. */
+export function parentLine(idx: CardIndex, root: string): string | undefined {
+  const r = idx.get(root);
+  return r && startsBranch(r) && r.parentId ? lineRoot(idx, r.parentId) : undefined;
+}
+
+/** "①", "②"… (plain numbers after 20). */
+export const circled = (n: number) => (n >= 1 && n <= 20 ? String.fromCharCode(0x2460 + n - 1) : `(${n})`);
+
+/** A branch's label: its number in its source line, nested as "1.2". Empty for the main line. */
+export function branchLabel(idx: CardIndex, root: string): string {
+  const up = parentLine(idx, root);
+  if (up === undefined) return "";
+  const n = lineBranches(idx, linePath(idx, up, idx.get(root)?.parentId ?? undefined)).findIndex((c) => c.id === root) + 1;
+  const outer = branchLabel(idx, up);
+  return outer ? `${outer}.${n}` : String(n);
+}
+
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
   content: string;

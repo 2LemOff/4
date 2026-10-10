@@ -17,6 +17,9 @@ export const CHIPS = ["Why?", "How do you know?", "Example", "What if this is wr
 const CHIPS_KEY = "fractal.chipsOpen";
 
 let attachSeq = 0;
+type Recognizer = { lang: string; interimResults: boolean; onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null; onend: (() => void) | null; onerror: (() => void) | null; start: () => void; stop: () => void };
+const SpeechRec: (new () => Recognizer) | undefined =
+  typeof window !== "undefined" ? ((window as unknown as Record<string, unknown>).SpeechRecognition ?? (window as unknown as Record<string, unknown>).webkitSpeechRecognition) as (new () => Recognizer) | undefined : undefined;
 const isPicture = (f: Blob) => !f.type || f.type.startsWith("image/");
 
 const readChips = () => {
@@ -48,6 +51,8 @@ export function Composer({
   fromVisual,
   attach,
   addPicture,
+  above,
+  voice,
 }: {
   sessionId?: string;
   parentId: string | null;
@@ -78,6 +83,10 @@ export function Composer({
   attach?: boolean;
   /** a picture sent earlier, added again with the part of it to ask about */
   addPicture?: { blob: Blob; box: Box; n: number };
+  /** a row above the question box (e.g. where the next question goes) */
+  above?: React.ReactNode;
+  /** hold-to-speak (where the browser can turn speech into text) */
+  voice?: boolean;
 }) {
   const { apiKey } = useStore(settingsStore);
   const [text, setText] = useState(initialText ?? "");
@@ -97,6 +106,31 @@ export function Composer({
   // the model chosen before pictures needed one that can see them (back when they're all removed)
   const [switchedFrom, setSwitchedFrom] = useState<string>();
   const own = useRef<HTMLTextAreaElement>(null);
+  const [listening, setListening] = useState(false);
+  const rec = useRef<Recognizer | null>(null);
+  // hold to speak: no keyboard opens, so nothing on screen moves
+  const startVoice = () => {
+    if (!SpeechRec || rec.current) return;
+    const r = new SpeechRec();
+    r.lang = navigator.language || "en-US";
+    r.interimResults = false;
+    r.onresult = (e) => {
+      const said = Array.from(e.results, (x) => x[0]?.transcript ?? "").join(" ").trim();
+      if (said) setText((t) => (t.trim() ? `${t.trim()} ${said}` : said));
+    };
+    r.onend = r.onerror = () => {
+      rec.current = null;
+      setListening(false);
+    };
+    rec.current = r;
+    try {
+      r.start();
+      setListening(true);
+    } catch {
+      rec.current = null;
+    }
+  };
+  const stopVoice = () => rec.current?.stop();
   const ta = inputRef ?? own;
 
   useEffect(() => {
@@ -253,6 +287,7 @@ export function Composer({
       )}
       {(attached.length > 0 || preparing > 0) && <AttachedRow list={attached} preparing={preparing} onRemove={remove} onPart={setRegion} />}
       {pictureNote && <p className="muted small" role="status">{pictureNote}</p>}
+      {above}
       {chips && !big && (
         <div className="chips quick" aria-label="Quick questions">
           {CHIPS.map((c) => (
@@ -312,6 +347,29 @@ export function Composer({
               </button>
             )}
           </>
+        )}
+        {voice && SpeechRec && !big && (
+          <button
+            type="button"
+            className={`btn icon sm ${listening ? "on" : ""}`}
+            aria-label={listening ? "Listening: let go to stop" : "Hold to speak"}
+            aria-pressed={listening}
+            onPointerDown={(e) => {
+              e.preventDefault();
+              startVoice();
+            }}
+            onPointerUp={stopVoice}
+            onPointerCancel={stopVoice}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                if (listening) stopVoice();
+                else startVoice();
+              }
+            }}
+          >
+            <Icon name="mic" />
+          </button>
         )}
         <button type="button" className="btn icon sm" aria-label="Model settings" onClick={() => setOpen(true)}>
           <Icon name="settings" />

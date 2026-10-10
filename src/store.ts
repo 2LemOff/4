@@ -1,3 +1,4 @@
+import type { BranchMode } from "./panes";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { liveQuery } from "dexie";
 import { kvGet, kvSet } from "./db";
@@ -58,6 +59,12 @@ export interface AppSettings {
   quickAutoCheck: boolean;
   /** claim checks may search the web (OpenRouter's web plugin; costs more) */
   claimWebSearch: boolean;
+  /** how a branch opens beside the original */
+  branchMode: BranchMode;
+  /** a follow-up in a branch continues it ("thread") or starts a new branch from the same words ("branch") */
+  followUp: "thread" | "branch";
+  /** the keyboard shrinks the screen ("resize") or covers it while only the question box rises ("overlay") */
+  keyboardMode: "resize" | "overlay";
   synthesis: SynthesisSettings;
   /** models that answered 400 to a mid-conversation effort update */
   blockedConfigUpdate: string[];
@@ -89,6 +96,9 @@ export const defaultAppSettings = (): AppSettings => ({
   readMoreLines: 4,
   quickAutoCheck: false,
   claimWebSearch: false,
+  branchMode: "split",
+  followUp: "thread",
+  keyboardMode: "resize",
   synthesis: DEFAULT_SYNTHESIS,
   blockedConfigUpdate: [],
   backupReminderDays: 7,

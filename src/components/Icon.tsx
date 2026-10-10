@@ -37,6 +37,17 @@ const PATHS: Record<string, string> = {
   crop: "M7 3v14h14M3 7h14v14",
   text: "M5 7V5h14v2M12 5v14M9 19h6",
   attach: "M12 5v14M5 12h14",
+  split: "M4 4h16v16H4zM4 12h16",
+  bubble: "M4 5h16v10h-9l-5 4v-4H4z",
+  layer: "M12 3 2 8l10 5 10-5zM2 13l10 5 10-5",
+  expand: "M4 9V4h5M20 15v5h-5M4 4l6 6M20 20l-6-6",
+  seethrough: "M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18zM12 3v18M12 7h4M12 11h6M12 15h5",
+  swap: "M8 4v16M4 8l4-4 4 4M16 20V4M12 16l4 4 4-4",
+  mic: "M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3zM5 11a7 7 0 0 0 14 0M12 18v3",
+  thread: "M6 6h12M6 12h12M6 18h8",
+  grip: "M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01",
+  resize: "M20 10 10 20M20 16l-4 4",
+  size: "M4 14h6v6H4zM4 4h16v16",
 };
 
 export type IconName = keyof typeof PATHS;
@@ -49,7 +60,7 @@ export function Icon({ name, filled, size = 18, title }: { name: IconName; fille
       viewBox="0 0 24 24"
       fill={filled ? "currentColor" : "none"}
       stroke="currentColor"
-      strokeWidth={name === "more" ? 3 : 1.8}
+      strokeWidth={name === "more" || name === "grip" ? 3 : 1.8}
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden={title ? undefined : true}

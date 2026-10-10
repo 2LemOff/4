@@ -89,7 +89,7 @@ test.describe("photos and screenshots", () => {
     expect(second.messages[1]).toEqual(turn);
     expect(textOf(second.messages.at(-1))).toBe('About this part of the text in my picture: "the force grows"\n\nMy question: Why does it grow?');
     await expect(page.locator(".msg-user")).toHaveCount(2);
-    await expect(page.locator(".img-text mark.hl")).toHaveAttribute("data-n", "↳ 1");
+    await expect(page.locator(".img-text mark.hl")).toHaveAttribute("data-n", "①");
 
     // compact but tappable, and nothing wider than the screen
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);

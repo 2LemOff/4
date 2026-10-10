@@ -52,6 +52,8 @@ a { color: var(--accent); }
   border-inline: 1px solid var(--line);
   padding-top: env(safe-area-inset-top);
 }
+/* when a browser only shrinks the visible part for the keyboard, the app follows it (see keyboard.ts) */
+.app { height: var(--app-h, 100dvh); transform: translateY(var(--app-shift, 0px)); }
 .view { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow-x: clip; }
 .scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .pad { padding: 12px 16px 24px; }
@@ -484,3 +486,53 @@ mark.hl.src[data-n]::after { color: var(--found, var(--accent)); }
 .img-text .answer-text p { white-space: pre-line; }
 .picture-full { margin: 0; border-radius: 10px; overflow: hidden; background: var(--surface2); }
 .picture-full img { display: block; width: 100%; max-height: 60dvh; object-fit: contain; }
+
+/* A branch beside the original: split, bubble or layer. The original (.chat) is never re-laid out from its top. */
+.chat-wrap { flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; }
+.chat-wrap > .chat { flex: 1 1 auto; }
+.chat-wrap.mode-split.has-branch > .chat { flex: 0 1 var(--split-h); min-height: 64px; }
+.chat-wrap.mode-split.has-branch.max-branch > .chat { flex: 0 0 0; min-height: 0; overflow: hidden; }
+.chat-wrap.mode-split.has-branch.max-original > .chat,
+.chat-wrap.mode-split.has-branch.kb-open > .chat { flex: 1 1 auto; }
+.branch-host.split { flex: 1 1 0; min-height: 38px; display: flex; flex-direction: column; border-top: 2px solid var(--accent); background: var(--bg); }
+.chat-wrap.max-original > .branch-host.split,
+.chat-wrap.kb-open > .branch-host.split { flex: 0 0 auto; }
+.chat-wrap.max-original .branch-host.split .branch-pane,
+.chat-wrap.kb-open .branch-host.split .branch-pane { flex: 0 0 0; height: 0; overflow: hidden; }
+.branch-pane { flex: 1; min-height: 0; overflow-y: auto; position: relative; overscroll-behavior: contain; }
+.branch-pane .thread { padding-top: 4px; }
+.host-bar { display: flex; align-items: center; gap: 2px; padding: 2px 4px; min-height: 36px; border-bottom: 1px solid var(--line); background: var(--surface); flex: none; }
+.host-tabs { flex: 1; min-width: 0; display: flex; align-items: center; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+.btn.chip.host-tab { min-height: 28px; padding: 0 8px; gap: 4px; max-width: 170px; font-size: 0.8rem; }
+.host-tab .ellipsis { max-width: 120px; }
+.host-title { flex: 1; min-width: 0; padding: 0 4px; }
+.host-crumbs { margin: 4px 12px 0; }
+.host-modes { display: inline-flex; }
+.btn.icon.hbtn { width: 30px; min-width: 30px; min-height: 30px; padding: 0; border: none; background: transparent; color: var(--muted); flex: none; }
+.btn.icon.hbtn.on { color: var(--accent); background: var(--surface2); }
+.draft-branch { padding: 8px 12px; display: flex; flex-direction: column; gap: 6px; }
+.follow-switch { display: flex; gap: 6px; }
+.btn.chip.small-chip.on { background: var(--accent); color: var(--accent-ink); }
+/* layer: over the original, which stays untouched underneath */
+.branch-host.layer { position: absolute; inset: 0; z-index: 6; display: flex; flex-direction: column; }
+.branch-host.layer.down { inset: auto 0 0 0; background: none; }
+.layer-bar { width: 100%; min-height: 40px; display: flex; align-items: center; gap: 6px; padding: 0 12px; border: none; border-top: 2px solid var(--accent); background: var(--surface); color: var(--text); font: inherit; font-size: 0.9rem; cursor: pointer; text-align: left; }
+.layer-bar .ellipsis { flex: 1; }
+.branch-host.xray { opacity: 0.1; }
+@media (prefers-reduced-motion: no-preference) { .branch-host.layer, .branch-host.bubble { transition: opacity 0.15s ease; } }
+/* bubble: a floating branch you can move and resize */
+.branch-host.bubble { position: absolute; z-index: 7; display: flex; flex-direction: column; border: 1px solid var(--accent); border-radius: 14px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35); overflow: hidden; }
+.branch-host.bubble .host-bar { background: color-mix(in srgb, var(--surface) 92%, transparent); }
+.btn.icon.hbtn.grip { cursor: grab; touch-action: none; }
+.bubble-resize { position: absolute; right: 0; bottom: 0; width: 28px; height: 28px; padding: 0; display: grid; place-content: center; border: none; background: transparent; color: var(--muted); touch-action: none; cursor: nwse-resize; }
+.branch-host.bubble-mini { position: absolute; right: 8px; top: 40%; z-index: 7; }
+.bubble-dot { width: 44px; height: 44px; border-radius: 50%; border: 2px solid var(--accent); background: var(--surface); color: var(--accent); font: 700 1.05rem system-ui, sans-serif; box-shadow: 0 3px 12px rgba(0, 0, 0, 0.3); cursor: pointer; }
+/* overlay keyboard (Settings): only the question box rises above it */
+.chat-dock { padding-bottom: calc(4px + max(env(safe-area-inset-bottom), env(keyboard-inset-height, 0px))); }
+/* landscape: original | branch side by side */
+@media (orientation: landscape) and (min-width: 640px) {
+  .app:has(.chat-wrap.mode-split.has-branch) { max-width: none; }
+  .chat-wrap.mode-split.has-branch { flex-direction: row; }
+  .chat-wrap.mode-split.has-branch > .chat { flex: 1 1 50%; min-width: 0; }
+  .chat-wrap.mode-split.has-branch > .branch-host.split { flex: 1 1 50%; min-width: 0; border-top: none; border-left: 2px solid var(--accent); }
+}
