@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ask, settingsFor } from "../ai";
 import { councilChairman, councilMembers as councilMembersList } from "../council";
+import { taskSetup } from "../taskConfig";
 import { go, hrefCard } from "../route";
 import { settingsStore, updateSettings, useStore } from "../store";
 import { Icon } from "./Icon";
@@ -122,7 +123,7 @@ export function Composer({
     setErr("");
     const chair = council ? councilChairman() : model;
     if (council && !chair) return setErr("Choose a chairman in Settings › Council.");
-    const r = await ask({ sessionId, parentId, question, anchor, model: chair, settings: council ? settingsFor(chair) : settings, council, fromVisual });
+    const r = await ask({ sessionId, parentId, question, anchor, model: chair, settings: council ? taskSetup("chairman").settings : settings, council, fromVisual });
     setText("");
     onClearAnchor?.();
     if (onAsked) onAsked(r);

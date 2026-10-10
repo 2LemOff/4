@@ -116,11 +116,18 @@ Pyramid topics also open in the chat, shown as an indented outline.
 
 Turn on the **Council** toggle next to the question box before asking. It stays on for that topic until you turn it off. This follows [karpathy/llm-council](https://github.com/karpathy/llm-council), but conversations can continue.
 
-1. **Members** (newest Gemini Pro, Claude Opus, top ChatGPT and Grok by default) answer in parallel, each with the branch history.
-2. **Peer review:** members rank each other's anonymized answers ("Response A…"). This step can be turned off.
-3. The **chairman** (one fixed model, changeable between questions with **▾** or in Settings › Council) reasons and writes the final pyramid using **only the council's text**. Each point cites the answers it came from. A cheap verifier then checks every point against the member answers, and points that aren't supported are removed (or, if you prefer, badged "Not in the council's answers").
+1. **Members** (newest Gemini Pro, Claude Opus, top ChatGPT and Grok by default) answer in parallel, each with the branch history. Each member can have **its own settings** (⚙ next to it in Settings › Council), used for answering and reviewing.
+2. **Peer review:** members rank each other's anonymized answers ("Response A…"). This step can be turned off, and its prompt and length edited (⚙).
+3. The **chairman** (changeable between questions with **▾** or in Settings › Council; ⚙ for its prompt and settings) reasons and writes the final answer using **only the council's text**:
+   - In a full-text topic it writes normal text and ends every paragraph with the answers it came from (`[A, C]`). The app shows them as small badges and removes the tags from the text.
+   - A cheap verifier (the **Grounding check** task) checks every paragraph against the member answers. Paragraphs it can't find are **folded** under the answer ("1 paragraph not found in the members' answers"), never deleted, and left out of later questions.
+4. Under the answer:
+   - the **agreement** between the members
+   - each member's **full answer**, with **Continue with this model**
+   - **Not in the final answer:** the member sentences the chairman left out (an offline word check)
+   - the peer reviews
 
-Each member's answer has **Continue with this model**, which switches the council off and asks the next question with that model. Later questions replay a council answer as the plain question plus the checked JSON, with no reasoning, so history stays append-only.
+Pyramid topics keep the pyramid chairman: each point cites its sources, and unsupported points are removed or marked. **Council** on the tray asks the council about exactly the highlighted words. Later questions replay a council answer as the plain question plus the kept text (or the checked JSON), with no reasoning, so history stays append-only.
 
 ## Story slides (optional, on demand)
 

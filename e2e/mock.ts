@@ -209,6 +209,10 @@ export async function mockOpenRouter(page: Page, opts: MockOptions = {}): Promis
         const prefix = userText.match(/\(Answer id prefix: (K\d+)\)$/)?.[1];
         let text = opts.answer ? opts.answer(userText, body) : prefix ? pyramidAnswer(prefix) : ANSWER;
         if (userText.startsWith("Answer the question briefly")) text = userText.endsWith("Why?") ? "Because it is short." : "A short quick answer.";
+        if (userText.includes("COUNCIL RESPONSES") && !prefix) {
+          // full-text chairman: tagged paragraphs; the Mars one won't be found by the verifier
+          text = "Premise one is simple. [A, B]\n\nPremise two depends on it. [B]\n\nMars has two moons. [C]\n\nPremise three concludes. [A]";
+        }
         if (userText.includes("COUNCIL RESPONSES") && prefix) {
           // chairman: n5 has no source, n6 cites B (the verifier will reject n6)
           const a = JSON.parse(pyramidAnswer(prefix));
@@ -235,7 +239,8 @@ export async function mockOpenRouter(page: Page, opts: MockOptions = {}): Promis
       }
       if (systemText.includes("You check grounding")) {
         const ids = [...userText.matchAll(/^\[(K\d+\.n\d+)\]/gm)].map((m) => m[1]);
-        return reply(JSON.stringify({ results: ids.map((id) => ({ id, supported: !id.endsWith(".n6"), quote: "" })) }));
+        const paras = [...userText.matchAll(/^\[(p\d+)\] (.*)$/gm)].map((m) => ({ id: m[1], text: m[2] }));
+        return reply(JSON.stringify({ results: [...ids.map((id) => ({ id, supported: !id.endsWith(".n6"), quote: "" })), ...paras.map((p) => ({ id: p.id, supported: !p.text.includes("Mars"), quote: "" }))] }));
       }
       if (userText.includes("Candidates:")) {
         const ids = [...userText.matchAll(/^\[(\w+)\]/gm)].map((m) => m[1]);

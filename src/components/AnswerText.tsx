@@ -13,6 +13,8 @@ export interface AnswerMark {
   suffix?: string;
   className?: string;
   badge?: string;
+  /** find `quote` ignoring spacing and markdown (for marks placed from model text, like council sources) */
+  loose?: boolean;
 }
 
 const REMARK = [remarkGfm];
@@ -45,7 +47,7 @@ export const AnswerText = memo(function AnswerText({
     const resolve = (text: string): MarkSpan[] => {
       const out: MarkSpan[] = [];
       for (const m of marks) {
-        const at = resolveAnchor(text, m);
+        const at = m.loose ? findLoose(text, m.quote, 400) : resolveAnchor(text, m);
         if (at) out.push({ id: m.id, ...at, className: m.className, badge: m.badge });
       }
       if (find) {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aggregateRankings, applyGrounding, labelOf, parseRanking } from "../src/councilLogic";
+import { aggregateRankings, applyGrounding, labelOf, parseRanking, splitTagged, leftOut, agreement, agreementLabel } from "../src/councilLogic";
 import { parseAnswer } from "../src/answer";
 
 describe("rankings", () => {
@@ -39,5 +39,33 @@ describe("grounding", () => {
   it("can keep them flagged instead", () => {
     const r = applyGrounding(ans, ["A", "B"], [{ id: "K2.n1", supported: true }], false);
     expect(r.answer.nodes.map((n) => n.grounded)).toEqual([true, false, true, false]);
+  });
+});
+
+describe("full-text council", () => {
+  it("splits the chairman's text into blocks with their sources and strips the tags", () => {
+    const { blocks } = splitTagged("## Why\nLight scatters [A, C]. More on that. [B]\n\n- Blue wins [A]\n- Red loses (B and C)\n\nVitamin (A) helps eyes.\n\n```\ncode [A]\n```");
+    expect(blocks.map((b) => [b.text, b.sources.join("")])).toEqual([
+      ["## Why", ""],
+      ["Light scatters. More on that.", "ABC"],
+      ["- Blue wins", "A"],
+      ["- Red loses", "BC"],
+      ["Vitamin (A) helps eyes.", ""],
+      ["```\ncode [A]\n```", ""],
+    ]);
+  });
+  it("finds member sentences the final answer left out (offline word check)", () => {
+    const out = leftOut(
+      [{ label: "A", sentences: ["Rayleigh scattering favours short wavelengths strongly.", "Ozone absorbs ultraviolet radiation high above.", "Yes."] }],
+      "Short wavelengths are scattered strongly: Rayleigh scattering favours them.",
+    );
+    expect(out).toEqual([{ label: "A", sentence: "Ozone absorbs ultraviolet radiation high above." }]);
+  });
+  it("measures agreement between members", () => {
+    expect(agreement(["blue light scatters most strongly", "blue light scatters most strongly"])).toBe(1);
+    expect(agreement(["blue light scatters", "volcanic ash cools climates"])).toBe(0);
+    expect(agreementLabel(0.6)).toBe("high");
+    expect(agreementLabel(0.35)).toBe("medium");
+    expect(agreementLabel(0.1)).toBe("low");
   });
 });

@@ -70,6 +70,8 @@ export interface AppSettings {
     /** empty = newest Gemini Flash */
     verifier: string;
     removeUnsupported: boolean;
+    /** settings per member model (empty = that model's saved defaults) */
+    memberSettings?: Record<string, ModelSettings>;
   };
   story: StorySettings;
   lastBackupAt?: number;

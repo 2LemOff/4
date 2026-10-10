@@ -144,8 +144,21 @@ export function ChatScreen({ sid, focus, find, quote, ask }: { sid: string; focu
       list.push({ ...h, className: cls || undefined, badge: n ? `↳ ${n}` : undefined });
       m.set(h.cardId, list);
     }
+    // a council answer shows which members each paragraph came from
+    for (const c of cards) {
+      const blocks = c.council?.textSources;
+      if (!blocks?.length) continue;
+      const list = m.get(c.id) ?? [];
+      blocks.forEach((b, i) => {
+        if (!b.sources.length) return;
+        const words = b.text.replace(/\s+/g, " ").trim();
+        const tail = words.slice(-Math.min(40, words.length));
+        list.push({ id: `src:${c.id}:${i}`, quote: tail, start: 0, end: 0, loose: true, className: "src", badge: b.sources.join("·") });
+      });
+      m.set(c.id, list);
+    }
     return m;
-  }, [highlights, counts, trayIds, disputed]);
+  }, [highlights, counts, trayIds, disputed, cards]);
 
   if (!data) return <div className="center muted">Loading…</div>;
   if (!session || !leafId) {
@@ -333,6 +346,17 @@ export function ChatScreen({ sid, focus, find, quote, ask }: { sid: string; focu
           >
             {quotes.length > 0 && (
               <>
+                <button
+                  className="toolbtn"
+                  aria-pressed={councilOn}
+                  onClick={() => {
+                    setCouncil(true);
+                    inputRef.current?.focus();
+                  }}
+                >
+                  <Icon name="council" size={17} />
+                  <span>Council</span>
+                </button>
                 <button className="toolbtn" onClick={() => setQuickOpen({ draft: { cardId: parentId, highlightIds: trayHs.map((h) => h.id), quotes } })}>
                   <Icon name="bolt" size={17} />
                   <span>Quick</span>

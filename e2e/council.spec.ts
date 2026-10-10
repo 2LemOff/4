@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { mockOpenRouter } from "./mock";
-import { askDock, connect, item, usePyramids } from "./helpers";
+import { askDock, connect, item, selectWords, usePyramids } from "./helpers";
 
 test.describe("LLM Council", () => {
   test("toggle on: members answer, review, the chairman writes a grounded answer; follow-ups continue", async ({ page }) => {
@@ -94,5 +94,71 @@ test.describe("LLM Council", () => {
     await askDock(page, "Your view?");
     await expect.poll(() => calls.stream.length).toBe(m + 1);
     expect(calls.stream[m].model).toBe("x-ai/grok-4.5");
+  });
+});
+
+test.describe("LLM Council, full text", () => {
+  test("members with their own settings; the answer keeps its sources, folds what the check can't find, and lists what it left out", async ({ page }) => {
+    const calls = await mockOpenRouter(page);
+    await connect(page);
+    // own settings for one member
+    await page.goto("/#/settings/council");
+    await page.getByRole("button", { name: "Settings for gemini-3.5-pro" }).click();
+    const member = page.getByRole("dialog", { name: "Member: gemini-3.5-pro" });
+    await member.locator('input[type="number"]').first().fill("1234");
+    await member.getByRole("button", { name: "Done" }).click();
+    await expect(page.getByText("own settings")).toBeVisible();
+    await page.goto("/#/");
+
+    await page.getByRole("button", { name: "Council", exact: true }).click();
+    await page.getByLabel("What do you want to understand?").fill("Why is the sky blue?");
+    await page.getByRole("button", { name: "Ask", exact: true }).click();
+    await expect(page.locator(".msg-ai > .answer-text")).toContainText("Premise three concludes.", { timeout: 15000 });
+    const memberCalls = calls.stream.filter((b) => !JSON.stringify(b.messages).includes("COUNCIL RESPONSES"));
+    expect(memberCalls.find((b) => b.model === "google/gemini-3.5-pro")!.max_tokens).toBe(1234);
+    expect(memberCalls.every((b) => !b.response_format)).toBe(true);
+    const chair = calls.stream.find((b) => JSON.stringify(b.messages).includes("COUNCIL RESPONSES"))!;
+    expect(chair.messages.at(-1).content).toContain("End every paragraph and every list item with the labels of the responses");
+    expect(chair.response_format).toBeUndefined();
+
+    // shown without tags, with small source badges; the Mars paragraph is folded, not lost
+    const answer = page.locator(".msg-ai > .answer-text").first();
+    await expect(answer).not.toContainText("[A, B]");
+    await expect(answer).not.toContainText("Mars");
+    await expect(page.locator('mark.hl.src[data-n="A·B"]')).toHaveCount(1);
+    const folded = page.locator("details.unverified");
+    await expect(folded).toContainText("1 paragraph not found in the members' answers");
+    await folded.locator("summary").click();
+    await expect(folded).toContainText("Mars has two moons.");
+    // how it was made: agreement, the members' full answers, and what the final answer left out
+    await page.locator("details.council > summary").click();
+    await expect(page.getByLabel(/Agreement \d+%/)).toBeVisible();
+    await page.getByText(/^Not in the final answer/).click();
+    await expect(page.locator("details.council")).toContainText("It has a second sentence about observers.");
+
+    // a follow-up replays the kept text, without tags or the folded paragraph
+    await page.locator(".composer").getByRole("button", { name: "Council", exact: true }).click();
+    await page.locator(".dock textarea").fill("And at sunset?");
+    await page.locator(".dock").getByRole("button", { name: "Ask", exact: true }).click();
+    await expect.poll(() => calls.stream.at(-1).messages.at(-1).content).toBe("And at sunset?");
+    const replay = calls.stream.at(-1).messages[2].content as string;
+    expect(replay).toBe("Premise one is simple.\n\nPremise two depends on it.\n\nPremise three concludes.");
+  });
+
+  test("Council on the tray asks the council about exactly those words", async ({ page }) => {
+    const calls = await mockOpenRouter(page);
+    await connect(page);
+    await page.getByLabel("What do you want to understand?").fill("Why is the sky blue?");
+    await page.getByRole("button", { name: "Ask", exact: true }).click();
+    await expect(page.locator("[data-answer]")).toHaveCount(1);
+    await selectWords(page, 0, "Premise one is simple.");
+    await page.getByRole("toolbar", { name: "Selected text" }).getByRole("button", { name: "Mark+" }).click();
+    await page.getByRole("group", { name: "Highlights in your question" }).getByRole("button", { name: "Council" }).click();
+    await expect(page.locator(".composer").getByRole("button", { name: "Council", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await page.locator(".dock textarea").fill("Is this right?");
+    await page.locator(".dock").getByRole("button", { name: "Ask", exact: true }).click();
+    await expect.poll(() => calls.stream.filter((b) => JSON.stringify(b.messages).includes("COUNCIL RESPONSES")).length).toBe(1);
+    const member = calls.stream.find((b) => b.model === "anthropic/claude-opus-5.5" && JSON.stringify(b.messages).includes("Is this right?"))!;
+    expect(member.messages.at(-1).content).toBe('About this part of your previous answer: "Premise one is simple."\n\nMy question: Is this right?');
   });
 });

@@ -448,3 +448,12 @@ mark.hl.disputed { text-decoration: underline wavy var(--danger); text-decoratio
 .claim { display: flex; gap: 6px; align-items: flex-start; padding: 2px 0; }
 .claim-v { font-weight: 700; width: 1em; flex: none; }
 .claim-body { min-width: 0; }
+
+/* Council: sources per paragraph, agreement, folded paragraphs */
+mark.hl.src { background: transparent; cursor: default; }
+mark.hl.src[data-n]::after { color: var(--found, var(--accent)); }
+.agree { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+.agree-track { flex: 1; height: 8px; border-radius: 4px; background: var(--surface2); overflow: hidden; }
+.agree-bar { display: block; height: 100%; background: var(--found, var(--accent)); }
+.unverified { border-style: dashed; }
+.unverified-p { opacity: 0.8; border-left: 3px dashed var(--warn); padding-left: 8px; margin: 6px 0; }

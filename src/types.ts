@@ -153,6 +153,14 @@ export interface CouncilData {
   unsupported?: string[];
   removed?: boolean;
   chairmanReasoning?: string;
+  /** full-text council: each kept paragraph with the answers it came from */
+  textSources?: { text: string; sources: string[] }[];
+  /** full-text council: paragraphs not found in the members' answers (folded, never deleted) */
+  unverified?: { text: string; sources: string[] }[];
+  /** member sentences the final answer left out */
+  leftOut?: { label: string; sentence: string }[];
+  /** how much the members agree (0–1) */
+  agreement?: number;
 }
 
 export interface Session {

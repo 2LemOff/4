@@ -167,14 +167,8 @@ export function composeSynthesisPrompt(s: SynthesisSettings, categories: string[
 
 // ── LLM Council ──────────────────────────────────────────────────────────────
 
-export const CHAIRMAN_RULES = `You are the Chairman of an LLM Council. Several models answered the learner's message; their answers (Response A, B, …) and peer reviews follow.
-Write the single final answer in the required JSON pyramid format, following the system prompt's style.
-Grounding rules (strict):
-- Use ONLY information that appears in the council's responses. Add nothing from your own knowledge or any other source.
-- Every node must include "sources": the labels of the responses it comes from, e.g. ["A","C"].
-- Where members disagree, state the disagreement as its own node with both sources.
-- If something the learner needs is not covered by the council, add a node saying "Not covered by the council: …" instead of filling it in.
-- Weigh the peer rankings when choosing between conflicting claims.`;
+/** Pyramid topics: what the chairman's reply must look like (after the chairman task's instructions). */
+export const CHAIRMAN_PYRAMID_FORMAT = `Write the final answer in the required JSON pyramid format. Every node must include "sources": the labels of the responses it comes from, e.g. ["A","C"]. State a disagreement as its own node with both sources, and a gap as a node saying "Not covered by the council: …".`;
 
 /** `task`: the review instructions (Settings › Models › Peer review), including the JSON format. */
 export function reviewPrompt(question: string, responses: string, task: string): string {

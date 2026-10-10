@@ -144,6 +144,9 @@ export const TASKS: TaskDef[] = [
     hint: "Writes the council's final answer from the members' text only.",
     kind: "text",
     defaultIsAnswer: true,
+    prompt:
+      "You are the Chairman of an LLM Council. Several models answered the learner's message; their answers (Response A, B, …) and peer reviews follow. Write the single best final answer, following the system prompt's style.\nGrounding rules (strict):\n- Use ONLY information that appears in the council's responses. Add nothing from your own knowledge or any other source.\n- Where members disagree, say so and name the responses.\n- If something the learner needs is not covered by the council, write \"Not covered by the council: …\" instead of filling it in.\n- Weigh the peer rankings when choosing between conflicting claims.",
+    fixed: "End every paragraph and every list item with the labels of the responses it comes from, in square brackets, e.g. [A, C].",
   },
   {
     id: "verifier",
