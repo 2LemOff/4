@@ -53,8 +53,14 @@ export const ANSWER_FORMAT = `${ANSWER_FORMAT_MARKER} Reply with JSON only, noth
 - Start every new node and group id with the prefix given at the end of the user's message (e.g. "K7.n1", "K7.g1").
 - Use null for "group", "parent" or "title" when there is none.`;
 
-/** The frozen prompt a new session starts with: the editable prompt plus the fixed format section. */
-export const sessionPrompt = (editable: string) => `${editable.trim()}\n\n${ANSWER_FORMAT}`;
+export type AnswerFormat = "text" | "pyramid";
+
+/**
+ * The frozen prompt a new session starts with. Full-text topics (the chat default) get only the editable prompt;
+ * pyramid topics also get the fixed format section.
+ */
+export const sessionPrompt = (editable: string, format: AnswerFormat = "text") =>
+  format === "pyramid" ? `${editable.trim()}\n\n${ANSWER_FORMAT}` : editable.trim();
 export const usesPyramids = (systemPrompt: string) => systemPrompt.includes(ANSWER_FORMAT_MARKER);
 
 /** Which built-in rules are present in the (possibly hand-edited) text. */

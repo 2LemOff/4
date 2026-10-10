@@ -1,5 +1,5 @@
 import { db } from "../db";
-import { go, hrefCard } from "../route";
+import { go, hrefChat } from "../route";
 import { useLive } from "../store";
 import { outlineToMarkdown } from "../prompts";
 import { runOutline, synthesize } from "../synthesis";
@@ -23,7 +23,7 @@ export function OutlineScreen({ id }: { id: string }) {
     <div className="scroll pad">
       <div className="navrow">
         <button className="btn" onClick={() => go("#/library")}>↑ Library</button>
-        {session && <button className="btn" onClick={() => go(hrefCard(session.id, session.lastCardId))}>Continue learning</button>}
+        {session && <button className="btn" onClick={() => go(hrefChat(session.id))}>Continue learning</button>}
       </div>
       {working && <p className="muted pulse" role="status">Synthesizing in the background…</p>}
       {outline.status === "error" && (
@@ -45,7 +45,7 @@ export function OutlineScreen({ id }: { id: string }) {
                   <li key={j}>
                     {p.text}{" "}
                     {p.cardIds.map((cid) => (
-                      <button key={cid} className="btn chip src" aria-label="Open the card this came from" onClick={() => go(hrefCard(outline.sessionId, cid))}>
+                      <button key={cid} className="btn chip src" aria-label="Open the card this came from" onClick={() => go(hrefChat(outline.sessionId, { focus: cid }))}>
                         ↗
                       </button>
                     ))}

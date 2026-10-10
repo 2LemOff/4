@@ -1,17 +1,20 @@
 import { expect, test } from "@playwright/test";
 import { mockOpenRouter } from "./mock";
-import { askDock, connect, item } from "./helpers";
+import { askDock, connect, item, usePyramids } from "./helpers";
 
 test.describe("LLM Council", () => {
   test("toggle on: members answer, review, the chairman writes a grounded answer; follow-ups continue", async ({ page }) => {
     const calls = await mockOpenRouter(page);
     await connect(page);
+    await usePyramids(page);
     const toggle = page.getByRole("button", { name: "Council", exact: true });
     await expect(toggle).toHaveAttribute("aria-pressed", "false");
     await toggle.click();
     await expect(page.getByText(/Council on: each member answers/)).toBeVisible();
     await page.getByLabel("What do you want to understand?").fill("Why is the sky blue?");
     await page.getByRole("button", { name: "Ask", exact: true }).click();
+    await expect(page).toHaveURL(/#\/s\//);
+    await page.goto(page.url().replace("#/s/", "#/m/"));
     await expect(item(page, "K1.n4")).toBeVisible();
 
     const members = ["google/gemini-3.5-pro", "anthropic/claude-opus-5.5", "openai/gpt-5.6-sol", "x-ai/grok-4.5"];
@@ -26,7 +29,7 @@ test.describe("LLM Council", () => {
     expect(chairTurn).toContain("Response A:");
     expect(chairTurn).toContain("PEER REVIEWS");
     expect(chairTurn).toMatch(/\(Answer id prefix: K1\)$/);
-    expect(calls.json.some((b) => JSON.stringify(b).includes("You check grounding"))).toBe(true);
+    await expect.poll(() => calls.json.some((b) => JSON.stringify(b).includes("You check grounding"))).toBe(true);
 
     // n5 had no source and n6 was rejected by the verifier: both removed
     await expect(item(page, "K1.n5")).toHaveCount(0);
@@ -62,9 +65,12 @@ test.describe("LLM Council", () => {
   test("the chairman can be changed between questions, and any member can continue the chat", async ({ page }) => {
     const calls = await mockOpenRouter(page);
     await connect(page);
+    await usePyramids(page);
     await page.getByRole("button", { name: "Council", exact: true }).click();
     await page.getByLabel("What do you want to understand?").fill("Why is the sky blue?");
     await page.getByRole("button", { name: "Ask", exact: true }).click();
+    await expect(page).toHaveURL(/#\/s\//);
+    await page.goto(page.url().replace("#/s/", "#/m/"));
     await expect(item(page, "K1.n4")).toBeVisible();
 
     await page.getByRole("button", { name: "Council settings" }).click();

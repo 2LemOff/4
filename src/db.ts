@@ -1,5 +1,5 @@
 import Dexie, { type Table } from "dexie";
-import type { Bookmark, Card, MediaRecord, Outline, Session } from "./types";
+import type { Bookmark, Card, Highlight, MediaRecord, Outline, Session } from "./types";
 import type { Story } from "./storyTypes";
 import { quantize } from "./search";
 
@@ -20,6 +20,7 @@ export class FractalDB extends Dexie {
   bookmarks!: Table<Bookmark, string>;
   stories!: Table<Story, string>;
   media!: Table<MediaRecord, string>;
+  highlights!: Table<Highlight, string>;
 
   constructor(name = "fractal") {
     super(name);
@@ -44,6 +45,8 @@ export class FractalDB extends Dexie {
             if (v.vector instanceof Float32Array) v.vector = quantize(v.vector);
           }),
       );
+    // v3: words highlighted in chat answers
+    this.version(3).stores({ highlights: "id,sessionId,cardId,createdAt" });
   }
 }
 

@@ -126,7 +126,7 @@ const TOGGLE_LABELS: Record<keyof PromptToggles, string> = {
 };
 
 function PromptSettings() {
-  const { systemPrompt } = useStore(settingsStore);
+  const { systemPrompt, answerFormat } = useStore(settingsStore);
   const toggles = detectToggles(systemPrompt);
   return (
     <section>
@@ -141,11 +141,25 @@ function PromptSettings() {
       <textarea className="input" rows={14} value={systemPrompt} onChange={(e) => updateSettings({ systemPrompt: e.target.value })} aria-label="System prompt" />
       <button className="btn" onClick={() => updateSettings({ systemPrompt: DEFAULT_SYSTEM_PROMPT })}>Reset to default</button>
       <p className="muted small">Default: {composeSystemPrompt().length} characters.</p>
-      <details className="group">
-        <summary>Answer format (fixed, added after your prompt)</summary>
-        <p className="muted small">The app needs answers as pyramids, so this part can't be edited.</p>
-        <pre className="prompt-pre">{ANSWER_FORMAT}</pre>
-      </details>
+      <fieldset className="group">
+        <legend>How new topics are answered</legend>
+        <label className="check">
+          <input type="radio" name="answer-format" checked={answerFormat !== "pyramid"} onChange={() => updateSettings({ answerFormat: "text" })} />
+          <span>Full text, like Claude or Gemini (the chat)</span>
+        </label>
+        <label className="check">
+          <input type="radio" name="answer-format" checked={answerFormat === "pyramid"} onChange={() => updateSettings({ answerFormat: "pyramid" })} />
+          <span>Pyramid points (for the old map)</span>
+        </label>
+        <p className="muted small">Full text sends only your prompt above. Pyramid adds the fixed format section below.</p>
+      </fieldset>
+      {answerFormat === "pyramid" && (
+        <details className="group">
+          <summary>Answer format (fixed, added after your prompt)</summary>
+          <p className="muted small">The old map needs answers as pyramids, so this part can't be edited.</p>
+          <pre className="prompt-pre">{ANSWER_FORMAT}</pre>
+        </details>
+      )}
     </section>
   );
 }

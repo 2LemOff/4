@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { db } from "../db";
 import { drawSlide, narrateSlide, runStory } from "../stories";
 import { STORY_STYLES, svgDataUri, type StyleId } from "../storyStyles";
-import { go, hrefMap } from "../route";
+import { go, hrefChat } from "../route";
 import { settingsStore, updateSettings, useLive, useStore } from "../store";
 import { Icon } from "../components/Icon";
 import type { PictureType, StorySlide } from "../storyTypes";
@@ -78,7 +78,7 @@ export function StoryScreen({ id }: { id: string }) {
     );
   }
 
-  const back = () => go(hrefMap(story.sessionId, { focus: story.cardId }));
+  const back = () => go(hrefChat(story.sessionId, { focus: story.cardId }));
   const cycleSpeed = () => {
     const next = SPEEDS[(SPEEDS.indexOf(rate) + 1) % SPEEDS.length] ?? 1;
     updateSettings((s) => ({ story: { ...s.story, playbackRate: next } }));
@@ -91,7 +91,7 @@ export function StoryScreen({ id }: { id: string }) {
 
   const head = (
     <div className="topbar">
-      <button className="btn icon sm" aria-label="Back to the map" onClick={back}><Icon name="prev" /></button>
+      <button className="btn icon sm" aria-label="Back to the answer" onClick={back}><Icon name="prev" /></button>
       <strong className="grow ellipsis">{story.title || "Story"}</strong>
       <span className="muted small">{STORY_STYLES[story.style as StyleId]?.label ?? story.style}</span>
     </div>
@@ -162,7 +162,7 @@ export function StoryScreen({ id }: { id: string }) {
         </p>
         <div className="story-caption" aria-label="Caption">
           {sentences(s.narration).map((t, k) => (
-            <button key={k} className="caption-line" onClick={() => go(hrefMap(story.sessionId, { focus: story.cardId, quote: t }))}>
+            <button key={k} className="caption-line" onClick={() => go(hrefChat(story.sessionId, { focus: story.cardId, quote: t }))}>
               {t}
             </button>
           ))}

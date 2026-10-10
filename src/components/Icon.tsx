@@ -24,6 +24,10 @@ const PATHS: Record<string, string> = {
   next: "M9 18l6-6-6-6",
   story: "M4 5h16v12H4zM9 9.5v5l4.5-2.5zM8 21h8",
   select: "M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 17h6M17 14v6",
+  copy: "M9 9h11v11H9zM5 15H4V4h11v1",
+  highlight: "M14.5 3.5l6 6-8.5 8.5H6v-6zM4 21h8",
+  branch: "M6 3v18M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 9c0 6-12 4-12 10",
+  back: "M15 18l-6-6 6-6",
 };
 
 export type IconName = keyof typeof PATHS;

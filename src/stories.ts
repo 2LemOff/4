@@ -8,6 +8,7 @@ import { newestOf } from "./models";
 import { indexCards, pathToRoot } from "./tree";
 import { drawPrompt, normalizeStory, sanitizeSvg, STORY_SCHEMA, storyPrompt, type StyleId } from "./storyStyles";
 import type { Story, StoryScope, StorySlide } from "./storyTypes";
+import type { Card } from "./types";
 import { imageSlide, patchSlide, resumeVideos } from "./media";
 
 const key = () => settingsStore.get().apiKey;
@@ -26,6 +27,9 @@ export function visionModel(): string {
   return ms.find((m) => m.id === pref)?.id ?? ms.sort((a, b) => (b.created ?? 0) - (a.created ?? 0))[0]?.id ?? pref;
 }
 
+/** An answer as text for a story: full-text answers as written, pyramid answers as an outline. */
+const answerText = (c: Card) => (c.answer && !c.answer.converted ? outlineText(c.answer) : c.assistant?.content || outlineText(cardAnswer(c)));
+
 /** The material a story teaches: one answer, one pyramid, or the whole branch down to an answer. */
 async function material(story: Story): Promise<string> {
   const cards = await db.cards.where("sessionId").equals(story.sessionId).toArray();
@@ -35,10 +39,10 @@ async function material(story: Story): Promise<string> {
   if (story.scope === "pyramid" && ans && story.nodeIds?.length) return `Question: ${card.question}\n${subsetOutline(ans, story.nodeIds)}`;
   if (story.scope === "branch") {
     return pathToRoot(indexCards(cards), card.id)
-      .map((c) => `Question: ${c.question}\n${outlineText(cardAnswer(c))}`)
+      .map((c) => `Question: ${c.question}\n${answerText(c)}`)
       .join("\n\n");
   }
-  return `Question: ${card.question}\n${outlineText(ans)}`;
+  return `Question: ${card.question}\n${answerText(card)}`;
 }
 
 export async function createStory(o: { sessionId: string; cardId: string; scope: StoryScope; nodeIds?: string[]; style?: StyleId }): Promise<string> {

@@ -30,6 +30,43 @@ export function siblings(idx: CardIndex, id: string): Card[] {
   return children(idx, c.parentId);
 }
 
+/**
+ * The card a chat shows last when opened at `id`: `preferred` (the branch you were on) when it lies below `id`,
+ * otherwise the newest answer at every level below `id`.
+ */
+export function leafFrom(idx: CardIndex, id: string, preferred?: string): string {
+  if (preferred && preferred !== id && idx.has(preferred) && pathToRoot(idx, preferred).some((c) => c.id === id)) return preferred;
+  let cur = id;
+  for (let guard = 0; guard < 10_000; guard++) {
+    const kids = children(idx, cur);
+    if (!kids.length) break;
+    cur = kids[kids.length - 1].id;
+  }
+  return cur;
+}
+
+/** Cards whose question was asked about each highlight (highlight id → count). */
+export function highlightBranches(cards: Card[]): Map<string, number> {
+  const m = new Map<string, number>();
+  for (const c of cards) for (const h of c.anchor?.highlightIds ?? []) m.set(h, (m.get(h) ?? 0) + 1);
+  return m;
+}
+
+/** Every card as a row of the branch tree (depth-first, oldest first), for the Branches list. */
+export function treeRows(idx: CardIndex): { card: Card; depth: number }[] {
+  const out: { card: Card; depth: number }[] = [];
+  const roots = [...idx.values()].filter((c) => !c.parentId || !idx.has(c.parentId)).sort((a, b) => a.createdAt - b.createdAt);
+  const seen = new Set<string>();
+  const walk = (c: Card, depth: number) => {
+    if (seen.has(c.id)) return;
+    seen.add(c.id);
+    out.push({ card: c, depth });
+    for (const k of children(idx, c.id)) walk(k, depth + 1);
+  };
+  for (const r of roots) walk(r, 0);
+  return out;
+}
+
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
   content: string;
@@ -38,9 +75,16 @@ export interface ChatMessage {
   configuration_update?: { reasoning: { effort: string } };
 }
 
+/** A question about highlighted words: one quote, or several numbered quotes sent as one prompt. */
+export function highlightTurn(quotes: string[], question: string): string {
+  if (quotes.length === 1) return `About this part of your previous answer: "${quotes[0]}"\n\nMy question: ${question}`;
+  return `About these parts of your previous answers:\n${quotes.map((t, i) => `${i + 1}. "${t}"`).join("\n")}\n\nMy question: ${question}`;
+}
+
 export function userTurn(anchor: Anchor | undefined, question: string, seq?: number): string {
   let q = question;
-  if (anchor && anchor.scope === "pyramid") q = `About this pyramid from your previous answer:\n${anchor.text}\n\nMy question: ${question}`;
+  if (anchor && anchor.scope === "highlights" && anchor.quotes?.length) q = highlightTurn(anchor.quotes, question);
+  else if (anchor && anchor.scope === "pyramid") q = `About this pyramid from your previous answer:\n${anchor.text}\n\nMy question: ${question}`;
   else if (anchor && anchor.scope === "category") q = `About this category from your previous answer:\n${anchor.text}\n\nMy question: ${question}`;
   else if (anchor && anchor.quotes && anchor.quotes.length > 1)
     q = `About these points from your previous answers:\n${anchor.quotes.map((t) => `- "${t}"`).join("\n")}\n\nMy question: ${question}`;

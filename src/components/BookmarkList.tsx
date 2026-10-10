@@ -1,9 +1,9 @@
 import { db } from "../db";
-import { go, hrefMap } from "../route";
+import { go, hrefChat, hrefMap } from "../route";
 import { useLive } from "../store";
 import { Icon } from "./Icon";
 
-/** Compact list of saved places; tapping one opens the map with that point selected. */
+/** Compact list of saved places; an answer opens in the chat, a point of the old map opens on the map. */
 export function BookmarkList() {
   const data = useLive(async () => ({ bookmarks: await db.bookmarks.orderBy("createdAt").reverse().toArray(), sessions: await db.sessions.toArray() }), []);
   if (!data?.bookmarks.length) return null;
@@ -13,7 +13,7 @@ export function BookmarkList() {
       <h2 className="section">Bookmarks</h2>
       {data.bookmarks.map((b) => (
         <div key={b.id} className="bookmark-row">
-          <button className="row-btn compact grow" onClick={() => go(hrefMap(b.sessionId, { focus: b.cardId, node: b.nodeId }))}>
+          <button className="row-btn compact grow" onClick={() => go(b.nodeId ? hrefMap(b.sessionId, { focus: b.cardId, node: b.nodeId }) : hrefChat(b.sessionId, { focus: b.cardId }))}>
             <span className="row-line">
               <Icon name="bookmark" filled size={13} /> <strong>{b.label}</strong>
             </span>

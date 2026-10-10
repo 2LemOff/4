@@ -1,49 +1,59 @@
 # Fractal: learn by questioning every answer
 
-Ask a frontier AI a question. Then question its answer, or any later answer, as deeply as you like. Fractal keeps every question as a branch of a tree, not a straight chat, and draws every answer as a **pyramid of reasoning** on one map, so you can see how ideas connect and always find your way back.
+Ask a frontier AI a question and read the answer in a classic chat, like Claude or Gemini. Then **highlight any words of an answer and ask about them**, or highlight several passages, even in different answers, and ask about all of them in one prompt. Every question starts its own branch, so the conversation becomes a tree you can always find your way back through.
 
 Mobile only. Runs in the phone browser (installable PWA). Everything stays on your phone, with a one-tap backup.
 
 ## The core loop
 
 1. Ask a question. The box on Home grows with what you paste and keeps paragraph breaks.
-2. The answer arrives as one or more **pyramids** on the **map**. Each one builds from the bottom up:
-   - **Foundations** (first principles) at the top, grouped into **categories**, which can sit inside other categories
-   - **Steps** derived from the foundations
-   - a **Conclusion** at the bottom, whose title names the pyramid
+2. The answer arrives **whole, exactly as the model wrote it** (paragraphs, lists, tables). The app never cuts or shortens it.
+3. Select words in an answer. A slim bar above the question box offers:
+   - **Mark+**: keep the words as a yellow highlight and collect them
+   - **Ask**: the same, then type your question
+   - **Copy**
+4. Collected highlights wait in a **tray** above the question box, numbered 1, 2, 3… They can come from one answer or several. Your question is sent once, quoting all of them:
+   ```
+   About these parts of your previous answers:
+   1. "…"
+   2. "…"
 
-   Unrelated parts of an answer become separate pyramids.
-3. Ask about:
-   - one point (tap it)
-   - several points (**Select several points**, then tap each)
-   - a category (tap its title)
-   - a whole pyramid (**Ask about the whole pyramid** in the point's panel)
-4. The new question appears as a bubble linked to what you asked about, and its answer as new pyramids. Answers can build on earlier points (dashed "builds on" links). When an answer declares no link, similar earlier points are linked with dotted lines.
-5. **✦ Synthesize** compiles the whole tree into a **Concept Outline** in the **Library**.
+   My question: …
+   ```
+5. Asking about highlights starts a **branch** under the answer they came from (with highlights in several answers, under the latest of them). Then:
+   - a highlight shows **↳ n**, the number of questions asked about it; tap it to see them, add it to the tray again, or delete it
+   - your message shows **‹ 1/2 ›** when an answer has several follow-ups
+   - the title (top bar) opens the **Branches** list of the whole tree
+6. **✦ Synthesize** (in ⋯) compiles the whole tree into a **Concept Outline** in the **Library**.
 
-```
- [Light]──────────[Scattering]        ← categories of foundations
-  Light is waves   Small particles
-        \           /  scatter short waves
-       Air scatters blue the most     ← step
-              |
-        "Blue sky"                    ← conclusion (pyramid title)
-              |
-      ( Why not violet? )             ← your question, linked to the point
-              |
-        new pyramid… ─ ─ builds on ─ ─ ▶ earlier foundation
-```
+**Why answers aren't cut into pieces:** a highlight is saved as the quoted words plus where they sit in the answer, with a little context before and after so it can be found again. The chat never needs pieces.
 
-## The map
+**Compact layout:**
+- one slim top bar (‹, the title, ⋯) that hides while you scroll down
+- a one-line question box with the quick questions (?), the council, the model settings and a round send button
+- the selection bar and the tray appear only while they're needed
+- no tab bar inside a topic
 
-- **Moving around:** pinch to zoom and drag to move, plus buttons for **−**, **+**, **Fit** and **Focus** (frames the current answer).
-- **All | Foundations:** Foundations shows only the first principles of the whole topic, inside their categories, as an overview.
-- **Selecting a point** highlights what it rests on and what it supports, across answers. The panel lists both, plus a bookmark and **Learn as a story**.
-- **Outline** shows the same answer as an indented list for reading.
-- **Breadcrumbs** (small pills) show the path to the current answer; tapping one jumps there.
-- **Search by concept:** embeddings find candidates, an LLM reranks them, and the map opens on the exact point. Offline, search falls back to word matching.
-- **Bookmarks:** a small black-and-white ribbon on points and answers. Saved items are listed on Home and in the Library.
-- **Compact UI:** the quick-question chips sit behind the **?** toggle. Icons are monochrome line drawings, not emoji.
+## The old map (pyramid topics)
+
+Settings › System prompt › **How new topics are answered** can switch new topics to **pyramid points** (JSON) for the old map. A pyramid answer builds from the bottom up:
+- **Foundations** (first principles) at the top, grouped into nested **categories**
+- **Steps** derived from the foundations
+- a **Conclusion** at the bottom, whose title names the pyramid
+
+Unrelated parts of an answer become separate pyramids.
+
+The map is reachable from ⋯ › **Open the old map** (any topic; full-text answers appear as a chain of paragraphs) and is kept as it was:
+- pinch to zoom and drag, plus **−**, **+**, **Fit** and **Focus**
+- **All | Foundations**, an **Outline** view, and breadcrumbs
+- tap a point to ask about it, **Select several points**, a category or **the whole pyramid**
+- dashed "builds on" links between answers, and dotted links to similar earlier points
+
+Pyramid topics also open in the chat, shown as an indented outline.
+
+**Search by concept** (⋯ in the chat): embeddings find candidates, an LLM reranks them, and the chat opens at the answer with the words marked. Offline, search falls back to word matching.
+
+**Bookmarks:** a small black-and-white ribbon, in an answer's ⋯ (or on a map point). Saved items are listed on Home and in the Library.
 
 ## LLM Council (optional, per question)
 
@@ -57,7 +67,7 @@ Each member's answer has **Continue with this model**, which switches the counci
 
 ## Story slides (optional, on demand)
 
-**Learn as a story** (in the ⋯ menu, or on a point) turns this answer, the point's pyramid, or the whole branch into 3–4 narrated slides. Nothing is generated until you ask.
+**Learn as a story** (in an answer's ⋯, or on a map point) turns this answer, the point's pyramid, or the whole branch into 3–4 narrated slides. Nothing is generated until you ask.
 
 - **Style:**
   - **TED-Ed:** a character-driven hook, warm flat illustrations, and a reflective question at the end
@@ -75,7 +85,7 @@ Each member's answer has **Continue with this model**, which switches the counci
   - autoplay to the next slide
 - **Player:**
   - picture with a slow pan and zoom
-  - captions: tap a sentence to ask about it on the map
+  - captions: tap a sentence to ask about it in the chat
   - ◀ ▶ / ⏸ ▶ controls and the speed chip
   - **Regenerate** for any picture or narration that failed or was deleted
 
@@ -105,7 +115,7 @@ Every topic starts with a hidden system prompt containing exactly two rules:
 1. "Break answers into distinct, logical premises."
 2. "When the query challenges something you said, re-examine it honestly: concede plainly if you were wrong, defend it with reasons if you were right, and say so when you are unsure."
 
-Edit it in **Settings › System prompt**, where each rule has a switch and you can add your own text. A fixed **answer format** section (the pyramid JSON) is added after it and shown there read-only. Changes apply to **new** topics; a topic keeps the prompt it started with.
+Edit it in **Settings › System prompt**, where each rule has a switch and you can add your own text. New topics are answered in **full text** and get only this prompt. If you choose **pyramid points** for new topics, a fixed **answer format** section (the pyramid JSON) is added after it, shown there read-only. Changes apply to **new** topics; a topic keeps the prompt it started with.
 
 ## Models and settings (OpenRouter)
 
@@ -121,10 +131,11 @@ Fractal talks to [OpenRouter](https://openrouter.ai): Gemini Pro and Flash, Grok
 
 ## Memory ("context left")
 
-Each branch sends only its own path. The question's panel shows tokens used against the model's limit. At about 70%, **Continue in a fresh branch** starts a new linked root from a short summary.
+Each branch sends only its own path. An answer's ⋯ shows tokens used against the model's limit. At about 70%, **Continue in a fresh branch** starts a new linked root from a short summary.
 
 ## Not in this version
 
 - Spending guardrails (each answer shows its cost, and AI images and video show an estimate first).
 - Cloud sync or accounts: the zip backup is the way to move data.
 - Swipe gestures: the map uses pinch and drag, and everything else uses buttons.
+- The Library of all highlights, saved visuals, Test me, export and monthly costs (next version).

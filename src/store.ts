@@ -2,7 +2,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { liveQuery } from "dexie";
 import { kvGet, kvSet } from "./db";
 import type { ModelInfo, ModelSettings, SynthesisSettings } from "./types";
-import { DEFAULT_SYNTHESIS, DEFAULT_SYSTEM_PROMPT, migrateSystemPrompt } from "./prompts";
+import { DEFAULT_SYNTHESIS, DEFAULT_SYSTEM_PROMPT, migrateSystemPrompt, type AnswerFormat } from "./prompts";
 import { listModels } from "./openrouter";
 import { DEFAULT_STORY, type StorySettings } from "./storyStyles";
 
@@ -46,6 +46,8 @@ export interface AppSettings {
   modelSettings: Record<string, ModelSettings>;
   /** hidden system prompt used for NEW sessions (each session keeps its own frozen copy) */
   systemPrompt: string;
+  /** how NEW topics are answered: full text (the chat) or pyramid JSON (the old map) */
+  answerFormat: AnswerFormat;
   synthesis: SynthesisSettings;
   /** models that answered 400 to a mid-conversation effort update */
   blockedConfigUpdate: string[];
@@ -70,6 +72,7 @@ export const defaultAppSettings = (): AppSettings => ({
   roleModels: {},
   modelSettings: {},
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
+  answerFormat: "text",
   synthesis: DEFAULT_SYNTHESIS,
   blockedConfigUpdate: [],
   backupReminderDays: 7,

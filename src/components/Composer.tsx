@@ -37,6 +37,7 @@ export function Composer({
   onCouncilToggle,
   onCouncilSettings,
   forceModel,
+  sendIcon,
 }: {
   sessionId?: string;
   parentId: string | null;
@@ -57,6 +58,8 @@ export function Composer({
   onCouncilSettings?: () => void;
   /** switch the single model from outside ("Continue with this model") */
   forceModel?: { id: string; n: number };
+  /** a round send icon instead of the "Ask" label (the chat) */
+  sendIcon?: boolean;
 }) {
   const { apiKey } = useStore(settingsStore);
   const [text, setText] = useState("");
@@ -181,11 +184,16 @@ export function Composer({
         <button type="button" className="btn icon sm" aria-label="Model settings" onClick={() => setOpen(true)}>
           <Icon name="settings" />
         </button>
-        {!big && (
-          <button type="submit" className="btn primary sm" disabled={!text.trim()}>
-            Ask
-          </button>
-        )}
+        {!big &&
+          (sendIcon ? (
+            <button type="submit" className="btn primary icon sm round" aria-label="Ask" disabled={!text.trim()}>
+              <Icon name="up" />
+            </button>
+          ) : (
+            <button type="submit" className="btn primary sm" disabled={!text.trim()}>
+              Ask
+            </button>
+          ))}
       </form>
       {big && (
         <button type="button" className="btn primary wide" disabled={!text.trim()} onClick={() => submit(text)}>

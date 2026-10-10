@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  ALL_ON, DEFAULT_SYNTHESIS, DEFAULT_SYSTEM_PROMPT, PREMISES, PRESET_PROMPTS, migrateSystemPrompt,
-  composeSynthesisPrompt, composeSystemPrompt, detectToggles, outlineToMarkdown, serializeTree, setToggle,
-} from "../src/prompts";
+import { ALL_ON, DEFAULT_SYNTHESIS, DEFAULT_SYSTEM_PROMPT, PREMISES, PRESET_PROMPTS, migrateSystemPrompt, composeSynthesisPrompt, composeSystemPrompt, detectToggles, outlineToMarkdown, serializeTree, setToggle, ANSWER_FORMAT, sessionPrompt, usesPyramids } from "../src/prompts";
 
 describe("system prompt", () => {
   it("has exactly the two rules", () => {
@@ -71,5 +68,16 @@ describe("serializeTree / outline markdown", () => {
   });
   it("renders markdown", () => {
     expect(outlineToMarkdown("T", "S", [{ heading: "H", points: [{ text: "p", cardIds: [] }] }])).toBe("# T\n\nS\n\n## H\n- p\n");
+  });
+});
+
+describe("answer format of new topics", () => {
+  it("full text (the chat) sends only the editable prompt; pyramid adds the fixed format section", () => {
+    const editable = composeSystemPrompt();
+    expect(sessionPrompt(editable)).toBe(editable);
+    expect(sessionPrompt(editable, "text")).toBe(editable);
+    expect(usesPyramids(sessionPrompt(editable, "text"))).toBe(false);
+    expect(sessionPrompt(editable, "pyramid")).toBe(`${editable}\n\n${ANSWER_FORMAT}`);
+    expect(usesPyramids(sessionPrompt(editable, "pyramid"))).toBe(true);
   });
 });

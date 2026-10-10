@@ -60,7 +60,7 @@ export async function ask(o: AskOptions): Promise<{ cardId: string; sessionId: s
       title: o.question.slice(0, 80),
       rootCardId: cardId,
       lastCardId: cardId,
-      systemPrompt: sessionPrompt(settingsStore.get().systemPrompt),
+      systemPrompt: sessionPrompt(settingsStore.get().systemPrompt, settingsStore.get().answerFormat),
       answerModel: o.model,
       createdAt: now,
       updatedAt: now,
@@ -155,7 +155,8 @@ export async function run(cardId: string, opts: { noSchema?: boolean } = {}): Pr
     const status: Card["status"] =
       st.finishReason === "content_filter" ? "refused" : st.finishReason === "length" ? "length" : st.error ? "error" : "done";
     const known = new Set(all.flatMap((c) => c.answer?.nodes.map((n) => n.id) ?? []));
-    const parsed = st.content.trim() ? parseAnswer(st.content, cardPrefix(card)) : undefined;
+    // full-text topics keep the answer exactly as written; only pyramid topics are parsed
+    const parsed = usesPyramids(session.systemPrompt) && st.content.trim() ? parseAnswer(st.content, cardPrefix(card)) : undefined;
     const answer = parsed ? pruneCrossLinks(parsed, known) : undefined;
     await db.cards.update(cardId, {
       status,
@@ -311,8 +312,10 @@ export async function startFreshBranch(fromCardId: string): Promise<string> {
   if (session && usesPyramids(session.systemPrompt)) {
     fresh.seq = all.reduce((m, c) => Math.max(m, c.seq ?? 0), 0) + 1;
   }
-  fresh.answer = textAnswer(summary.trim(), cardPrefix(fresh));
-  fresh.blocks = fresh.answer.nodes.map((n) => n.text);
+  if (fresh.seq !== undefined) {
+    fresh.answer = textAnswer(summary.trim(), cardPrefix(fresh));
+    fresh.blocks = fresh.answer.nodes.map((n) => n.text);
+  }
   await db.cards.put(fresh);
   await db.sessions.update(from.sessionId, { lastCardId: fresh.id, updatedAt: Date.now() });
   void embedCards([fresh.id]).catch(() => {});
@@ -354,6 +357,7 @@ export async function deleteBranch(cardId: string): Promise<{ sessionId: string;
   const ids = [...doomed];
   await db.cards.bulkDelete(ids);
   await db.vectors.where("cardId").anyOf(ids).delete();
+  await db.highlights.where("cardId").anyOf(ids).delete();
   const left = all.filter((c) => !doomed.has(c.id));
   if (!left.length) {
     await db.outlines.where("sessionId").equals(card.sessionId).delete();

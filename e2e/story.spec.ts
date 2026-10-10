@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { mockOpenRouter } from "./mock";
-import { askRoot, connect, item } from "./helpers";
+import { askRootMap, connect, item } from "./helpers";
 
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
 
@@ -8,7 +8,7 @@ test.describe("Story slides", () => {
   test("on demand from the menu: ScienceClic style, drawn shapes, narration, speed and asking about a line", async ({ page }) => {
     const calls = await mockOpenRouter(page);
     await connect(page);
-    await askRoot(page, "Why is the sky blue?");
+    await askRootMap(page, "Why is the sky blue?");
     expect(calls.speech).toHaveLength(0);
 
     await page.getByRole("button", { name: "Menu" }).click();
@@ -55,7 +55,7 @@ test.describe("Story slides", () => {
   test("from a point: covers its pyramid in TED-Ed style; reopens from the list", async ({ page }) => {
     const calls = await mockOpenRouter(page);
     await connect(page);
-    await askRoot(page, "Why is the sky blue?");
+    await askRootMap(page, "Why is the sky blue?");
     await page.getByRole("button", { name: "Fit the whole map" }).click();
     await item(page, "K1.n6").click();
     await page.getByRole("region", { name: "Selected point" }).getByRole("button", { name: "Learn as a story" }).click();
@@ -69,8 +69,9 @@ test.describe("Story slides", () => {
     expect(material).toContain("An observer only sees light");
     expect(material).not.toContain("Air molecules scatter blue light");
 
-    await page.getByRole("button", { name: "Back to the map" }).click();
-    await page.getByRole("button", { name: "Menu" }).click();
+    // back in the chat, the answer's menu lists the story
+    await page.getByRole("button", { name: "Back to the answer" }).click();
+    await page.getByRole("button", { name: "Answer details" }).first().click();
     await page.getByRole("button", { name: /Learn as a story/ }).click();
     await page.getByRole("dialog", { name: "Learn as a story" }).getByRole("button", { name: /Mia and the blue sky/ }).click();
     await expect(page).toHaveURL(/#\/story\//);
@@ -94,7 +95,7 @@ test.describe("Story slides", () => {
 
     // the next story uses the notes; deleting a narration file leaves the text with Regenerate
     await page.goto("/#/");
-    await askRoot(page, "Why is the sky blue?");
+    await askRootMap(page, "Why is the sky blue?");
     await page.getByRole("button", { name: "Menu" }).click();
     await page.getByRole("button", { name: /Learn as a story/ }).click();
     await page.getByRole("dialog", { name: "Learn as a story" }).getByRole("radio", { name: "ScienceClic" }).click();
@@ -133,7 +134,7 @@ test.describe("Story AI pictures", () => {
     await page.getByLabel("Duration (seconds)").selectOption("4");
 
     await page.goto("/#/");
-    await askRoot(page, "Why is the sky blue?");
+    await askRootMap(page, "Why is the sky blue?");
     await page.getByRole("button", { name: "Menu" }).click();
     await page.getByRole("button", { name: /Learn as a story/ }).click();
     await page.getByRole("dialog", { name: "Learn as a story" }).getByRole("button", { name: "Make the story" }).click();

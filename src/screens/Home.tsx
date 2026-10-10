@@ -5,7 +5,7 @@ import { Sheet } from "../components/Sheet";
 import { roleModel } from "../ai";
 import { BookmarkList } from "../components/BookmarkList";
 import { Composer } from "../components/Composer";
-import { go, hrefMap } from "../route";
+import { go, hrefChat } from "../route";
 import { modelsStore, settingsStore, useLive, useStore } from "../store";
 
 const DAY = 24 * 3600 * 1000;
@@ -20,7 +20,7 @@ export function Home() {
   return (
     <div className="scroll pad">
       <h1 className="brand">Fractal</h1>
-      <p className="muted small">Ask anything. Answers grow as pyramids from first principles; tap any point to question it.</p>
+      <p className="muted small">Ask anything. Then highlight any words in an answer to ask about them; every question starts its own branch.</p>
       {!apiKey && (
         <div className="banner">
           Connect OpenRouter to start. <a href="#/settings/account">Open Settings</a>
@@ -47,7 +47,7 @@ export function Home() {
           } catch {
             /* ignore */
           }
-          go(hrefMap(r.sessionId, { focus: r.cardId }));
+          go(hrefChat(r.sessionId, { focus: r.cardId }));
         }}
       />
       {sheet && (
@@ -61,7 +61,7 @@ export function Home() {
         <>
           <h2 className="section">Continue learning</h2>
           {sessions.map((s) => (
-            <button key={s.id} className="row-btn compact" onClick={() => go(hrefMap(s.id, { focus: s.lastCardId }))}>
+            <button key={s.id} className="row-btn compact" onClick={() => go(hrefChat(s.id))}>
               <strong>{s.title}</strong>
               <span className="muted small">{new Date(s.updatedAt).toLocaleDateString()}</span>
             </button>

@@ -1,12 +1,14 @@
 import { useMemo, useState } from "react";
-import { searchConcepts, type SearchOutcome } from "../ai";
+import { searchConcepts, type SearchOutcome, type SearchResult } from "../ai";
 import { db } from "../db";
 import { go, hrefCard } from "../route";
 import { useLive } from "../store";
 import { breadcrumbs, indexCards } from "../tree";
 import { Sheet } from "./Sheet";
+import type { Card } from "../types";
 
-export function SearchSheet({ onClose }: { onClose: () => void }) {
+/** Concept search over every topic. By default a hit opens the old map; the chat passes `onPick`. */
+export function SearchSheet({ onClose, onPick }: { onClose: () => void; onPick?: (r: SearchResult, card: Card) => void }) {
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
   const [out, setOut] = useState<SearchOutcome | null>(null);
@@ -37,7 +39,7 @@ export function SearchSheet({ onClose }: { onClose: () => void }) {
         if (!card) return null;
         const path = breadcrumbs(idx, r.cardId).map((c) => c.label).join(" › ");
         return (
-          <button key={r.cardId} className="row-btn" onClick={() => { go(hrefCard(card.sessionId, card.id, r.blockIdx)); onClose(); }}>
+          <button key={r.cardId} className="row-btn" onClick={() => { if (onPick) onPick(r, card); else go(hrefCard(card.sessionId, card.id, r.blockIdx)); onClose(); }}>
             <span className="small muted">{path}</span>
             <span>{r.text.length > 160 ? r.text.slice(0, 160) + "…" : r.text}</span>
             {r.why && <span className="small muted">{r.why}</span>}

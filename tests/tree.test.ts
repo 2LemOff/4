@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { breadcrumbs, buildMessages, children, drillCounts, indexCards, pathToRoot, siblings } from "../src/tree";
+import { breadcrumbs, buildMessages, children, drillCounts, highlightBranches, highlightTurn, indexCards, leafFrom, pathToRoot, siblings, treeRows, userTurn } from "../src/tree";
 import type { ReasoningDetail } from "../src/types";
 import { card } from "./fixtures";
 
@@ -90,5 +90,41 @@ describe("buildMessages", () => {
       { role: "system", content: "SYS" },
       { role: "user", content: "Hi" },
     ]);
+  });
+});
+
+describe("chat branches and highlights", () => {
+  const t0 = card({ id: "t0", question: "Root", createdAt: 1 });
+  const t1 = card({ id: "t1", parentId: "t0", question: "First follow-up", createdAt: 2 });
+  const t2 = card({ id: "t2", parentId: "t0", question: "Asked about words", createdAt: 3, anchor: { text: "x / y", quotes: ["x", "y"], scope: "highlights", highlightIds: ["h1", "h2"] } });
+  const t21 = card({ id: "t21", parentId: "t2", question: "Deeper", createdAt: 4, anchor: { text: "z", quotes: ["z"], scope: "highlights", highlightIds: ["h1"] } });
+  const tidx = indexCards([t0, t1, t2, t21]);
+
+  it("opens a branch at its newest answer unless the remembered one lies below", () => {
+    expect(leafFrom(tidx, "t0")).toBe("t21");
+    expect(leafFrom(tidx, "t0", "t1")).toBe("t1");
+    expect(leafFrom(tidx, "t1", "t21")).toBe("t1");
+    expect(leafFrom(tidx, "t21")).toBe("t21");
+  });
+
+  it("counts the questions asked about each highlight", () => {
+    const m = highlightBranches([t0, t1, t2, t21]);
+    expect(m.get("h1")).toBe(2);
+    expect(m.get("h2")).toBe(1);
+  });
+
+  it("lists the whole tree depth-first for the Branches sheet", () => {
+    expect(treeRows(tidx).map((r) => `${r.depth}:${r.card.id}`)).toEqual(["0:t0", "1:t1", "1:t2", "2:t21"]);
+  });
+
+  it("sends several highlights as one numbered prompt, and one highlight as a quote", () => {
+    expect(userTurn(t2.anchor, "How do these connect?")).toBe('About these parts of your previous answers:\n1. "x"\n2. "y"\n\nMy question: How do these connect?');
+    expect(userTurn(t21.anchor, "Why?")).toBe('About this part of your previous answer: "z"\n\nMy question: Why?');
+    expect(highlightTurn(["a"], "Q")).toBe(userTurn({ text: "a", quotes: ["a"], scope: "highlights" }, "Q"));
+  });
+
+  it("replays older anchors exactly as before", () => {
+    expect(userTurn({ text: "A", quotes: ["A", "B"], nodeIds: ["K1.n1", "K1.n2"], scope: "points" }, "Q")).toBe('About these points from your previous answers:\n- "A"\n- "B"\n\nMy question: Q');
+    expect(userTurn({ text: "S" }, "Q")).toBe('About this statement from your previous answer: "S"\n\nMy question: Q');
   });
 });

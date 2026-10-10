@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { mockOpenRouter } from "./mock";
-import { askDock, askRoot, connect, item } from "./helpers";
+import { askDock, askRootMap, connect, item, usePyramids } from "./helpers";
 
 const center = async (page: Page, id: string) => {
   const b = (await item(page, id).boundingBox())!;
@@ -11,7 +11,7 @@ test.describe("pyramid map", () => {
   test("an answer streams in as pyramids: foundations in categories above the conclusion", async ({ page }) => {
     const calls = await mockOpenRouter(page);
     await connect(page);
-    await askRoot(page, "Why is the sky blue?");
+    await askRootMap(page, "Why is the sky blue?");
     const first = calls.stream[0];
     expect(first.messages[0].content).toMatch(/^Break answers into distinct, logical premises\.\n\nWhen the query challenges something you said, re-examine it honestly/);
     expect(first.messages[0].content).not.toContain("first principles. Assume");
@@ -32,7 +32,7 @@ test.describe("pyramid map", () => {
   test("ask about a point: the question links to it and the new pyramid builds on the earlier one", async ({ page }) => {
     const calls = await mockOpenRouter(page);
     await connect(page);
-    await askRoot(page, "Why is the sky blue?");
+    await askRootMap(page, "Why is the sky blue?");
     await item(page, "K1.n3").click();
     const panel = page.getByRole("region", { name: "Selected point" });
     await expect(panel).toContainText("Air molecules scatter blue light the most.");
@@ -61,7 +61,7 @@ test.describe("pyramid map", () => {
   test("several points, a category and a whole pyramid can be asked about", async ({ page }) => {
     const calls = await mockOpenRouter(page);
     await connect(page);
-    await askRoot(page, "Why is the sky blue?");
+    await askRootMap(page, "Why is the sky blue?");
     await page.getByRole("button", { name: "Select several points" }).click();
     await item(page, "K1.n1").click();
     await item(page, "K1.n5").click();
@@ -92,7 +92,7 @@ test.describe("pyramid map", () => {
   test("foundations overview, zoom buttons and the outline view", async ({ page }) => {
     await mockOpenRouter(page);
     await connect(page);
-    await askRoot(page, "Why is the sky blue?");
+    await askRootMap(page, "Why is the sky blue?");
     const scale = async () => Number((await page.locator(".map-canvas").getAttribute("style"))!.match(/scale\(([\d.]+)\)/)![1]);
     const before = await scale();
     await page.getByRole("button", { name: "Zoom in" }).click();
@@ -116,7 +116,7 @@ test.describe("pyramid map", () => {
   test("drag pans the map and a two-finger pinch zooms it", async ({ page }) => {
     await mockOpenRouter(page);
     await connect(page);
-    await askRoot(page, "Why is the sky blue?");
+    await askRootMap(page, "Why is the sky blue?");
     const t = async () => {
       const m = (await page.locator(".map-canvas").getAttribute("style"))!.match(/translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.]+)\)/)!;
       return { x: Number(m[1]), y: Number(m[2]), k: Number(m[3]) };
@@ -159,7 +159,7 @@ test.describe("compact UI, input and bookmarks", () => {
   test("quick questions are hidden behind a toggle", async ({ page }) => {
     const calls = await mockOpenRouter(page);
     await connect(page);
-    await askRoot(page, "Why is the sky blue?");
+    await askRootMap(page, "Why is the sky blue?");
     await expect(page.getByRole("button", { name: "Why?", exact: true })).toHaveCount(0);
     await page.getByRole("button", { name: "Quick questions" }).click();
     await page.getByRole("button", { name: "Why?", exact: true }).click();
@@ -170,7 +170,7 @@ test.describe("compact UI, input and bookmarks", () => {
   test("a black-and-white bookmark saves a point and reopens it", async ({ page }) => {
     await mockOpenRouter(page);
     await connect(page);
-    await askRoot(page, "Why is the sky blue?");
+    await askRootMap(page, "Why is the sky blue?");
     await item(page, "K1.n3").click();
     const panel = page.getByRole("region", { name: "Selected point" });
     await panel.getByRole("button", { name: "Bookmark" }).click();
@@ -188,7 +188,7 @@ test.describe("compact UI, input and bookmarks", () => {
   test("no horizontal scroll and nothing smaller than 28px to tap", async ({ page }) => {
     await mockOpenRouter(page);
     await connect(page);
-    await askRoot(page, "Layout check");
+    await askRootMap(page, "Layout check");
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(0);
     const small = await page.$$eval("button.btn, .tabs a, .crumb, .seg button", (els) =>
@@ -231,12 +231,13 @@ test.describe("model settings", () => {
   test("chosen reasoning settings are what gets sent", async ({ page }) => {
     const calls = await mockOpenRouter(page);
     await connect(page);
+    await usePyramids(page);
     await page.getByRole("button", { name: "Model settings" }).click();
     const sheet = page.getByRole("dialog", { name: "Model settings" });
     await pick(page, "claude-sonnet");
     await sheet.getByRole("radio", { name: "minimal" }).click();
     await sheet.getByRole("button", { name: "Done" }).click();
-    await askRoot(page, "Why is the sky blue?");
+    await askRootMap(page, "Why is the sky blue?", "K1", { setFormat: false });
     const body = calls.stream[0];
     expect(body.model).toBe("anthropic/claude-sonnet-5.5");
     expect(body.reasoning).toEqual({ effort: "low" });
@@ -251,7 +252,7 @@ test.describe("limits, prompts and synthesis", () => {
       stream: () => (attempt++ === 0 ? { finish: "length", usage: { prompt_tokens: 100, completion_tokens: 302, completion_tokens_details: { reasoning_tokens: 301 } } } : {}),
     });
     await connect(page);
-    await askRoot(page, "Hard question");
+    await askRootMap(page, "Hard question");
     await page.locator(".item.qb").first().click();
     await expect(page.getByText("Ran out of room while thinking.")).toBeVisible();
     const before = calls.stream[0].max_tokens;
@@ -263,7 +264,7 @@ test.describe("limits, prompts and synthesis", () => {
   test("a nearly full branch offers a fresh linked branch", async ({ page }) => {
     const calls = await mockOpenRouter(page, { stream: () => ({ usage: { prompt_tokens: 750_000, completion_tokens: 5_000, cost: 1.2, completion_tokens_details: { reasoning_tokens: 0 } } }) });
     await connect(page);
-    await askRoot(page, "A very long discussion");
+    await askRootMap(page, "A very long discussion");
     await page.locator(".item.qb").first().click();
     await expect(page.getByLabel(/Context used: 755k \/ 1M/)).toBeVisible();
     await page.getByRole("button", { name: "Continue in a fresh branch" }).click();
@@ -274,27 +275,29 @@ test.describe("limits, prompts and synthesis", () => {
   test("edited system prompt applies to new topics only", async ({ page }) => {
     const calls = await mockOpenRouter(page);
     await connect(page);
-    await askRoot(page, "First topic");
+    await askRootMap(page, "First topic");
     await page.goto("/#/settings/prompt");
     await page.getByLabel("Honest pushback when challenged").uncheck();
     await expect(page.getByText("Answer format (fixed, added after your prompt)")).toBeVisible();
     await page.goto("/#/");
-    await askRoot(page, "Second topic");
+    await askRootMap(page, "Second topic");
     expect(calls.stream[0].messages[0].content).toContain("When the query challenges");
     expect(calls.stream[1].messages[0].content).not.toContain("When the query challenges");
     expect(calls.stream[1].messages[0].content).toContain("Answer format (required).");
   });
 
-  test("synthesize with a custom prompt, then follow a link back to the map", async ({ page }) => {
+  test("synthesize with a custom prompt, then follow a link back to the answer", async ({ page }) => {
     const calls = await mockOpenRouter(page);
     await connect(page);
-    await askRoot(page, "What is superposition?");
+    await askRootMap(page, "What is superposition?");
     await page.goto("/#/settings/synthesis");
     await page.getByLabel("Synthesis prompt").fill("Make flash-friendly notes.");
     await page.goto("/#/");
     await page.getByRole("button", { name: /What is superposition/ }).click();
-    await expect(item(page, "K1.n6")).toBeVisible();
-    await page.getByRole("button", { name: "Synthesize" }).click();
+    // a pyramid topic opens in the chat too, as a readable outline
+    await expect(page.locator(".msg-ai .answer-text")).toContainText("Foundation: Light is made of waves");
+    await page.getByRole("button", { name: "Topic menu" }).click();
+    await page.getByRole("button", { name: /Synthesize this topic/ }).click();
     await expect(page.getByText("Synthesizing in the background.")).toBeVisible();
     await page.goto("/#/library");
     await expect(page.getByText("Observers and premises")).toBeVisible();
@@ -303,7 +306,8 @@ test.describe("limits, prompts and synthesis", () => {
     expect(synth.messages[1].content).toContain("Foundation: Light is made of waves");
     await page.getByText("Observers and premises").click();
     await page.getByRole("button", { name: "Open the card this came from" }).click();
-    await expect(item(page, "K1.n1")).toBeVisible();
+    await expect(page).toHaveURL(/#\/s\/\w+\?focus=\w+/);
+    await expect(page.locator(".msg-ai .answer-text")).toContainText("Light is made of waves");
   });
 });
 
@@ -311,7 +315,7 @@ test.describe("search", () => {
   test("finds a point by concept and selects it on the map", async ({ page }) => {
     const calls = await mockOpenRouter(page);
     await connect(page);
-    await askRoot(page, "Why is the sky blue?");
+    await askRootMap(page, "Why is the sky blue?");
     await page.getByRole("button", { name: "Search" }).click();
     await page.getByLabel("Search query").fill("what does an observer see with their eyes");
     await page.getByRole("button", { name: "Search", exact: true }).last().click();
@@ -324,7 +328,7 @@ test.describe("search", () => {
   test("falls back to word matching when disconnected", async ({ page }) => {
     await mockOpenRouter(page);
     await connect(page);
-    await askRoot(page, "What is superposition?");
+    await askRootMap(page, "What is superposition?");
     const url = page.url();
     await page.goto("/#/settings/account");
     await page.getByRole("button", { name: "Disconnect" }).click();
@@ -347,7 +351,7 @@ test.describe("storage and backup", () => {
     });
     await mockOpenRouter(page);
     await connect(page);
-    await askRoot(page, "Why is the sky blue?");
+    await askRootMap(page, "Why is the sky blue?");
     await item(page, "K1.n3").click();
     await page.getByRole("region", { name: "Selected point" }).getByRole("button", { name: "Bookmark" }).click();
     await page.goto("/#/settings/storage");
@@ -375,7 +379,7 @@ test.describe("storage and backup", () => {
     await p2.goto("/#/");
     await expect(p2.getByRole("region", { name: "Bookmarks" })).toContainText("Air molecules");
     await p2.getByRole("button", { name: /^Why is the sky blue/ }).click();
-    await expect(item(p2, "K1.n6")).toBeVisible();
+    await expect(p2.locator(".msg-ai .answer-text")).toContainText("What you see depends on where you stand.");
     await fresh.close();
   });
 
@@ -391,7 +395,12 @@ test.describe("storage and backup", () => {
       await new Promise((r) => (tx.oncomplete = r));
       dbh.close();
     });
+    // a v1 link opens the chat, showing the old answer as written
     await page.goto("/#/s/old1/c/oc1");
+    await expect(page.locator(".msg-ai .answer-text")).toContainText("First old paragraph.");
+    await expect(page.locator(".msg-ai .answer-text")).toContainText("Second old paragraph.");
+    // and the old map still shows it as a chain
+    await page.goto("/#/m/old1?focus=oc1");
     await expect(page.locator(".item.foundation")).toContainText("First old paragraph.");
     await expect(page.locator(".item.conclusion")).toContainText("Second old paragraph.");
     await page.getByRole("button", { name: "Outline" }).click();

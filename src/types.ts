@@ -78,8 +78,10 @@ export interface Anchor {
   nodeIds?: string[];
   /** quoted texts of the selected points */
   quotes?: string[];
-  /** what was selected: some points, a whole pyramid, or a category */
-  scope?: "points" | "pyramid" | "category";
+  /** what was selected: some points, a whole pyramid, a category, or highlighted words in the chat */
+  scope?: "points" | "pyramid" | "category" | "highlights";
+  /** chat highlights this question is about (their quotes are in `quotes`) */
+  highlightIds?: string[];
   /** v1 sentence anchors (kept so old sessions replay unchanged) */
   blockIdx?: number;
   sentenceIdx?: number;
@@ -195,6 +197,19 @@ export interface SynthesisSettings {
   model: string;
   modelSettings?: ModelSettings;
   categoryMode: "reuse" | "free";
+}
+
+/** Words highlighted in an answer: the quote and where it sits in the answer's rendered text. */
+export interface Highlight {
+  id: string;
+  sessionId: string;
+  cardId: string;
+  quote: string;
+  start: number;
+  end: number;
+  prefix: string;
+  suffix: string;
+  createdAt: number;
 }
 
 export interface Bookmark {

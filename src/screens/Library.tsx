@@ -1,6 +1,6 @@
 import { db } from "../db";
 import { BookmarkList } from "../components/BookmarkList";
-import { go, hrefCard } from "../route";
+import { go, hrefChat } from "../route";
 import { useLive } from "../store";
 import type { Outline } from "../types";
 
@@ -64,7 +64,7 @@ export function Library() {
         <details className="category" open>
           <summary>Not synthesized yet <span className="muted small">({unsynthesized.length})</span></summary>
           {unsynthesized.map((s) => (
-            <button key={s.id} className="row-btn" onClick={() => go(hrefCard(s.id, s.lastCardId))}>
+            <button key={s.id} className="row-btn" onClick={() => go(hrefChat(s.id))}>
               <strong>{s.title}</strong>
               <span className="muted small">{new Date(s.updatedAt).toLocaleDateString()}</span>
             </button>
