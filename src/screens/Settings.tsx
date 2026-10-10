@@ -18,6 +18,7 @@ const SECTIONS = [
   ["council", "Council"],
   ["prompt", "System prompt"],
   ["synthesis", "Synthesis"],
+  ["views", "Views"],
   ["story", "Story"],
   ["storage", "Storage"],
 ] as const;
@@ -45,6 +46,7 @@ export function Settings({ section }: { section: string }) {
       {section === "prompt" && <PromptSettings />}
       {section === "synthesis" && <SynthesisSettings />}
       {section === "story" && <StorySettings />}
+      {section === "views" && <ViewSettings />}
       {(section === "storage" || section === "data") && <StorageSettings />}
     </div>
   );
@@ -150,6 +152,20 @@ function PromptSettings({ embedded }: { embedded?: boolean }) {
           <pre className="prompt-pre">{ANSWER_FORMAT}</pre>
         </details>
       )}
+    </section>
+  );
+}
+
+function ViewSettings() {
+  const { readMoreLines } = useStore(settingsStore);
+  return (
+    <section>
+      <h2 className="section">Views</h2>
+      <p className="muted small">The chat always shows every message in full. In the other views (Levels, Mind map, Big idea, the study doc, diagrams), long text is cut with Read more.</p>
+      <label className="field">
+        <span className="field-label">Lines before “Read more”: {readMoreLines}</span>
+        <input type="range" min={2} max={12} step={1} value={readMoreLines} onChange={(e) => updateSettings({ readMoreLines: Number(e.target.value) })} aria-label="Lines before Read more" />
+      </label>
     </section>
   );
 }

@@ -28,6 +28,7 @@ const PATHS: Record<string, string> = {
   highlight: "M14.5 3.5l6 6-8.5 8.5H6v-6zM4 21h8",
   branch: "M6 3v18M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 9c0 6-12 4-12 10",
   back: "M15 18l-6-6 6-6",
+  visualize: "M12 5.5a2 2 0 1 1 0 .01M5 18.5a2 2 0 1 1 0 .01M19 18.5a2 2 0 1 1 0 .01M11 7.5l-5 9M13 7.5l5 9M7 18.5h10",
 };
 
 export type IconName = keyof typeof PATHS;

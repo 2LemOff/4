@@ -206,6 +206,12 @@ export function outlineLines(ans: Answer): { depth: number; text: string; nodeId
   return lines;
 }
 
+/** A finished answer as text: full-text answers as written, pyramid answers as an outline. */
+export function cardMarkdown(c: { answer?: Answer; assistant?: { content: string }; blocks: string[] }): string {
+  if (c.answer && !c.answer.converted) return outlineText(c.answer);
+  return c.assistant?.content || c.blocks.join("\n\n");
+}
+
 export function outlineText(ans: Answer | undefined): string {
   if (!ans) return "";
   const label: Record<NodeKind, string> = { foundation: "Foundation", step: "Step", conclusion: "Conclusion" };

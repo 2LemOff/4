@@ -38,6 +38,8 @@ export function Composer({
   onCouncilSettings,
   forceModel,
   sendIcon,
+  initialText,
+  fromVisual,
 }: {
   sessionId?: string;
   parentId: string | null;
@@ -60,9 +62,16 @@ export function Composer({
   forceModel?: { id: string; n: number };
   /** a round send icon instead of the "Ask" label (the chat) */
   sendIcon?: boolean;
+  /** text typed in for you (e.g. a question offered by a view) */
+  initialText?: string;
+  /** asked from a visual's side chat */
+  fromVisual?: string;
 }) {
   const { apiKey } = useStore(settingsStore);
-  const [text, setText] = useState("");
+  const [text, setText] = useState(initialText ?? "");
+  useEffect(() => {
+    if (initialText) setText(initialText);
+  }, [initialText]);
   const [model, setModel] = useState(defaultModel ?? "");
   const [settings, setSettings] = useState<ModelSettings>(() => settingsFor(defaultModel ?? ""));
   const [open, setOpen] = useState(false);
@@ -113,7 +122,7 @@ export function Composer({
     setErr("");
     const chair = council ? councilChairman() : model;
     if (council && !chair) return setErr("Choose a chairman in Settings › Council.");
-    const r = await ask({ sessionId, parentId, question, anchor, model: chair, settings: council ? settingsFor(chair) : settings, council });
+    const r = await ask({ sessionId, parentId, question, anchor, model: chair, settings: council ? settingsFor(chair) : settings, council, fromVisual });
     setText("");
     onClearAnchor?.();
     if (onAsked) onAsked(r);

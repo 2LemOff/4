@@ -52,6 +52,7 @@ const answerText = (c: Card) => (c.answer && !c.answer.converted ? outlineText(c
 /** The material a story teaches: one answer, one pyramid, or the whole branch down to an answer. */
 async function material(story: Story): Promise<string> {
   const cards = await db.cards.where("sessionId").equals(story.sessionId).toArray();
+  if (story.scope === "text" && story.material) return story.material;
   const card = cards.find((c) => c.id === story.cardId);
   if (!card) throw new Error("The answer for this story no longer exists.");
   const ans = cardAnswer(card);
@@ -64,13 +65,14 @@ async function material(story: Story): Promise<string> {
   return `Question: ${card.question}\n${answerText(card)}`;
 }
 
-export async function createStory(o: { sessionId: string; cardId: string; scope: StoryScope; nodeIds?: string[]; style?: StyleId }): Promise<string> {
+export async function createStory(o: { sessionId: string; cardId: string; scope: StoryScope; nodeIds?: string[]; style?: StyleId; material?: string }): Promise<string> {
   const story: Story = {
     id: uid(),
     sessionId: o.sessionId,
     cardId: o.cardId,
     scope: o.scope,
     nodeIds: o.nodeIds,
+    material: o.material,
     title: "",
     scenario: "",
     style: o.style ?? cfg().style,

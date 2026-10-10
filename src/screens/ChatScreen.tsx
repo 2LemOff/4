@@ -25,7 +25,10 @@ import { SearchSheet } from "../components/SearchSheet";
 import { SelectionBar, useAnswerSelection } from "../components/SelectionBar";
 import { Sheet } from "../components/Sheet";
 import { StoryStartSheet } from "../components/StoryStartSheet";
-import type { Anchor, Card, Highlight } from "../types";
+import { VisualizeSheet } from "../components/VisualizeSheet";
+import type { Anchor, Card, Highlight, VisualScope } from "../types";
+import { scopeCards } from "../visuals";
+import { hrefVisual } from "../route";
 
 const NO_MARKS: AnswerMark[] = [];
 const NO_CARDS: Card[] = [];
@@ -55,12 +58,13 @@ export function answerMarkdown(c: Card, live: StreamView | undefined, pyramid: b
  * Select words in an answer to highlight them; highlights collect in a tray and are asked about in one prompt,
  * which starts a branch under the answer they come from.
  */
-export function ChatScreen({ sid, focus, find, quote }: { sid: string; focus?: string; find?: string; quote?: string }) {
+export function ChatScreen({ sid, focus, find, quote, ask }: { sid: string; focus?: string; find?: string; quote?: string; ask?: string }) {
   const data = useLive(async () => ({
     session: await db.sessions.get(sid),
     cards: await db.cards.where("sessionId").equals(sid).toArray(),
     highlights: await db.highlights.where("sessionId").equals(sid).toArray(),
     bookmarks: await db.bookmarks.where("sessionId").equals(sid).toArray(),
+    visuals: await db.visuals.where("sessionId").equals(sid).toArray(),
   }), [sid]);
   const streams = useStore(streamStore);
   useStore(modelsStore);
@@ -82,6 +86,8 @@ export function ChatScreen({ sid, focus, find, quote }: { sid: string; focus?: s
   const [answerMenu, setAnswerMenu] = useState<string>();
   const [openHighlight, setOpenHighlight] = useState<string>();
   const [storyFor, setStoryFor] = useState<string>();
+  const [visualize, setVisualize] = useState<{ cardId: string; scope: VisualScope }>();
+  const [visualsFor, setVisualsFor] = useState<string>();
   const [toast, setToast] = useState("");
   const [councilOn, setCouncilOn] = useState(() => readCouncil(sid));
   const [councilSheet, setCouncilSheet] = useState(false);
@@ -236,6 +242,9 @@ export function ChatScreen({ sid, focus, find, quote }: { sid: string; focus?: s
               marks={marksByCard.get(c.id) ?? NO_MARKS}
               find={c.id === focus ? flash : undefined}
               onMenu={setAnswerMenu}
+              visuals={data.visuals.filter((x) => x.cardId === c.id).length}
+              onVisualize={() => setVisualize({ cardId: c.id, scope: { kind: "answer", cardIds: [c.id], label: short(c.question, 60) } })}
+              onVisuals={() => setVisualsFor(c.id)}
               onContinue={(m) => {
                 setCouncil(false);
                 setForceModel({ id: m, n: Date.now() });
@@ -258,7 +267,19 @@ export function ChatScreen({ sid, focus, find, quote }: { sid: string; focus?: s
             onClose={clearSel}
             press={press}
             release={release}
-          />
+          >
+            <button
+              className="btn chip"
+              onClick={async () => {
+                const picked = sel;
+                clearSel();
+                const h = await saveHighlight({ ...picked, sessionId: sid });
+                setVisualize({ cardId: h.cardId, scope: { kind: "highlight", cardIds: [h.cardId], highlightIds: [h.id], label: `“${short(h.quote, 50)}”` } });
+              }}
+            >
+              <Icon name="visualize" size={15} /> Visualize
+            </button>
+          </SelectionBar>
         ) : (
           <HighlightTray
             items={trayItems}
@@ -268,7 +289,22 @@ export function ChatScreen({ sid, focus, find, quote }: { sid: string; focus?: s
             }}
             onRemove={(key) => (key === "quote" ? setAskQuote(undefined) : setTray((t) => t.filter((x) => x !== key)))}
             onClear={() => (setTray([]), setAskQuote(undefined))}
-          />
+          >
+            {trayHs.length > 0 && (
+              <button
+                className="btn chip"
+                onClick={() => {
+                  const owner = trayHs.reduce((x, y) => (pathIndex.get(y.cardId)! > pathIndex.get(x.cardId)! ? y : x)).cardId;
+                  setVisualize({
+                    cardId: owner,
+                    scope: { kind: trayHs.length > 1 ? "highlights" : "highlight", cardIds: [...new Set(trayHs.map((h) => h.cardId))], highlightIds: trayHs.map((h) => h.id), label: trayHs.length > 1 ? `${trayHs.length} highlights` : `“${short(trayHs[0].quote, 50)}”` },
+                  });
+                }}
+              >
+                <Icon name="visualize" size={15} /> Visualize
+              </button>
+            )}
+          </HighlightTray>
         )}
         <Composer
           sessionId={sid}
@@ -276,6 +312,7 @@ export function ChatScreen({ sid, focus, find, quote }: { sid: string; focus?: s
           anchor={anchor}
           placeholder={quotes.length > 1 ? "Ask about these…" : quotes.length ? "Ask about this…" : "Ask anything…"}
           sendIcon
+          initialText={ask}
           defaultModel={idx.get(parentId)?.model ?? roleModel("answer")}
           inputRef={inputRef}
           council={councilOn}
@@ -297,6 +334,18 @@ export function ChatScreen({ sid, focus, find, quote }: { sid: string; focus?: s
           </button>
           <button className="row-btn" onClick={() => (setMenu(false), setSearchOpen(true))}>
             <span className="row-line"><Icon name="search" size={16} /> Search by concept</span>
+          </button>
+          <button
+            className="row-btn"
+            onClick={() => (setMenu(false), setVisualize({ cardId: leafId, scope: { kind: "branch", cardIds: scopeCards("branch", cards, leafId), label: "This branch" } }))}
+          >
+            <span className="row-line"><Icon name="visualize" size={16} /> Visualize this branch</span>
+          </button>
+          <button
+            className="row-btn"
+            onClick={() => (setMenu(false), setVisualize({ cardId: leafId, scope: { kind: "topic", cardIds: scopeCards("topic", cards, leafId), label: `The whole topic: ${short(session.title, 40)}` } }))}
+          >
+            <span className="row-line"><Icon name="visualize" size={16} /> Visualize the whole topic</span>
           </button>
           <button
             className="row-btn"
@@ -358,6 +407,19 @@ export function ChatScreen({ sid, focus, find, quote }: { sid: string; focus?: s
         />
       )}
       {storyFor && <StoryStartSheet sessionId={sid} cardId={storyFor} onClose={() => setStoryFor(undefined)} />}
+      {visualize && <VisualizeSheet sessionId={sid} cardId={visualize.cardId} scope={visualize.scope} onClose={() => setVisualize(undefined)} />}
+      {visualsFor && (
+        <Sheet title="Visuals of this answer" onClose={() => setVisualsFor(undefined)}>
+          {data.visuals
+            .filter((x) => x.cardId === visualsFor)
+            .map((x) => (
+              <button key={x.id} className="row-btn" onClick={() => go(hrefVisual(x.id, x.arrangement ? "bigidea" : Object.keys(x.diagrams)[0] ?? "bigidea"))}>
+                <strong>{x.scope.label}</strong>
+                <span className="muted small">{new Date(x.createdAt).toLocaleDateString()} · {x.sentences.length} sentences</span>
+              </button>
+            ))}
+        </Sheet>
+      )}
       {searchOpen && (
         <SearchSheet
           onClose={() => setSearchOpen(false)}
@@ -384,6 +446,9 @@ function Turn({
   marks,
   find,
   onMenu,
+  visuals,
+  onVisualize,
+  onVisuals,
   onContinue,
 }: {
   card: Card;
@@ -394,6 +459,9 @@ function Turn({
   marks: AnswerMark[];
   find?: string;
   onMenu: (id: string) => void;
+  visuals: number;
+  onVisualize: () => void;
+  onVisuals: () => void;
   onContinue: (model: string) => void;
 }) {
   const sibs = siblings(idx, card.id);
@@ -431,6 +499,14 @@ function Turn({
         {card.council && <CouncilPanel council={card.council} onContinue={onContinue} />}
         {!streaming && (
           <div className="answer-foot">
+            <button className="btn icon sm" aria-label="Visualize this answer" onClick={onVisualize}>
+              <Icon name="visualize" size={16} />
+            </button>
+            {visuals > 0 && (
+              <button className="btn chip small-chip" onClick={onVisuals}>
+                Visuals ({visuals})
+              </button>
+            )}
             <button className="btn icon sm" aria-label="Copy answer" onClick={() => void navigator.clipboard?.writeText(md)}>
               <Icon name="copy" size={16} />
             </button>

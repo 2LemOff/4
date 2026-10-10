@@ -41,6 +41,8 @@ export interface AskOptions {
   settings: ModelSettings;
   /** answer with the LLM Council (model is then the chairman) */
   council?: boolean;
+  /** asked from a visual's side chat */
+  fromVisual?: string;
 }
 
 /** Create the card (and the session, for a first question) and start streaming. Returns immediately. */
@@ -78,6 +80,7 @@ export async function ask(o: AskOptions): Promise<{ cardId: string; sessionId: s
     model: o.model,
     modelSettings: o.settings,
     mode: o.council ? "council" : undefined,
+    fromVisual: o.fromVisual,
     status: "streaming",
     createdAt: now,
   };
@@ -352,6 +355,7 @@ export async function deleteBranch(cardId: string): Promise<{ sessionId: string;
   await db.cards.bulkDelete(ids);
   await db.vectors.where("cardId").anyOf(ids).delete();
   await db.highlights.where("cardId").anyOf(ids).delete();
+  await db.visuals.where("cardId").anyOf(ids).delete();
   const left = all.filter((c) => !doomed.has(c.id));
   if (!left.length) {
     await db.outlines.where("sessionId").equals(card.sessionId).delete();

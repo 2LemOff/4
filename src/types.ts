@@ -119,6 +119,8 @@ export interface Card {
   council?: CouncilData;
   /** fresh-branch portals */
   portalFrom?: string;
+  /** asked from a visual's side chat (the study doc) */
+  fromVisual?: string;
   createdAt: number;
 }
 
@@ -212,6 +214,36 @@ export interface Highlight {
   prefix: string;
   suffix: string;
   createdAt: number;
+}
+
+export type JobStatus = "running" | "done" | "error";
+
+/** What a visual shows: one answer, highlighted words, a branch or the whole topic. */
+export interface VisualScope {
+  kind: "answer" | "highlight" | "highlights" | "branch" | "topic";
+  cardIds: string[];
+  highlightIds?: string[];
+  label: string;
+}
+
+/**
+ * A saved visual of a scope: its sentences (split when it was made), the arrangement the structural views are
+ * drawn from, and any AI diagrams and sketch, each made on demand and kept so reopening costs nothing.
+ */
+export interface Visual {
+  id: string;
+  sessionId: string;
+  /** the answer it belongs to (the latest one in the scope) */
+  cardId: string;
+  scope: VisualScope;
+  scopeKey: string;
+  sentences: import("./split").Sentence[];
+  arrangement?: { status: JobStatus; data?: import("./arrange").Arrangement; error?: string };
+  diagrams: Partial<Record<import("./diagrams").DiagramType, { status: JobStatus; spec?: import("./diagrams").AnyDiagram; error?: string }>>;
+  sketch?: { status: JobStatus; svg?: string; error?: string };
+  notes?: string;
+  createdAt: number;
+  updatedAt: number;
 }
 
 export interface Bookmark {

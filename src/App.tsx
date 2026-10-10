@@ -8,6 +8,7 @@ import { MapScreen } from "./screens/MapScreen";
 import { OutlineScreen } from "./screens/OutlineScreen";
 import { Settings } from "./screens/Settings";
 import { StoryScreen } from "./screens/StoryScreen";
+import { VisualScreen } from "./screens/VisualScreen";
 
 export function App() {
   const [hash, setHash] = useState(location.hash);
@@ -23,7 +24,8 @@ export function App() {
     <div className="app">
       <div className="view">
         {r.name === "home" && <Home />}
-        {r.name === "chat" && <ChatScreen key={r.sid} sid={r.sid} focus={r.focus} find={r.find} quote={r.quote} />}
+        {r.name === "chat" && <ChatScreen key={r.sid} sid={r.sid} focus={r.focus} find={r.find} quote={r.quote} ask={r.ask} />}
+        {r.name === "visual" && <VisualScreen key={r.id} id={r.id} view={r.view} />}
         {r.name === "map" && <MapScreen key={r.sid} sid={r.sid} focus={r.focus} node={r.node} hl={r.hl} view={r.view} quote={r.quote} />}
         {r.name === "story" && <StoryScreen key={r.id} id={r.id} />}
         {r.name === "library" && <Library />}
@@ -32,7 +34,7 @@ export function App() {
       </div>
       <JobChip />
       {/* the chat keeps the whole screen for the conversation; Home and ⋯ lead to the rest */}
-      {r.name !== "chat" && <nav className="tabs" aria-label="Main">
+      {r.name !== "chat" && r.name !== "visual" && <nav className="tabs" aria-label="Main">
         <a href="#/" className={tab === "learn" ? "on" : ""} aria-current={tab === "learn" ? "page" : undefined}>Learn</a>
         <a href="#/library" className={tab === "library" ? "on" : ""} aria-current={tab === "library" ? "page" : undefined}>Library</a>
         <a href="#/settings" className={tab === "settings" ? "on" : ""} aria-current={tab === "settings" ? "page" : undefined}>Settings</a>

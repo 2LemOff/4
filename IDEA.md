@@ -34,6 +34,51 @@ Mobile only. Runs in the phone browser (installable PWA). Everything stays on yo
 - the selection bar and the tray appear only while they're needed
 - no tab bar inside a topic
 
+## Visualize
+
+Any answer, one highlight, the tray (several highlights), a branch or the whole topic can be seen in other ways:
+- **Visualize** under an answer
+- **Visualize** on the selection bar or the tray
+- ⋯ › **Visualize this branch** or **the whole topic**
+
+A picker lists every view, the ones that fit the text best first:
+- numbers → scale ladder or chart
+- dates → timeline
+- steps → flow
+- "because / leads to" → cause → effect
+- two or more highlights → compare or Venn
+
+**Nothing is lost.** Only when you visualize does the app split just that text into sentences (headings, list items and table rows included). One cheap call (Settings › Models › Arrange for views) places the sentences by id: subject levels, groups, kinds and links. It never rewrites them. Every sentence appears in the views word for word, and anything left unplaced goes to "Other details". If that call fails, the headings and questions give a simple arrangement.
+
+**Views drawn from that one arrangement** (no extra call):
+- **Big idea → details:** Big / Mid / Fine, and big idea first ⇄ first principles first.
+- **Levels:** where it sits, from the broad field down to this, each level with a short description.
+  - Its neighbours appear as dashed "ghosts", with "+N" instead of sideways scrolling. Tap one to ask about it.
+  - **＋** asks what else is on that level, and **Question it ↓** asks how this fits within it.
+  - **Compare 2** compares two topics.
+  - Your answer's groups sit at the bottom, shaded when you've asked about them, with badges (↳ questions asked, Council, Saved).
+  - A search box filters every level.
+- **Mind map:** the big idea in the middle, groups around it, with pinch, drag and − + Fit.
+- **Study doc:** sections with the answer's own paragraphs, headings and list items, plus **My notes** and a **side chat**. Questions asked there continue the topic as a branch, and their answers show in the doc.
+- **Argument chain:** foundations → steps → conclusions, with what each builds on.
+- **Outline.**
+
+**AI diagrams**, one cheap call each (Settings › Models › Diagrams):
+- concept map
+- compare table
+- Venn / overlap
+- process flow
+- cause → effect
+- timeline
+- scale ladder
+- numbers chart (log scale when values differ more than 100×)
+
+Every element cites the sentences it came from, and **Not in this diagram (n)** lists the ones it doesn't use. There's also an AI **sketch** and **story slides** of the selection.
+
+Tap anything in a view to see the exact sentences, then **Ask about this** or **Show in the answer** (the chat opens with the words marked). Visuals are saved: an answer shows **Visuals (n)**, and reopening costs nothing.
+
+**Read more** lives only in these views: long text is cut after a few lines (Settings › Views). The chat always shows everything.
+
 ## The old map (pyramid topics)
 
 Settings › System prompt › **How new topics are answered** can switch new topics to **pyramid points** (JSON) for the old map. A pyramid answer builds from the bottom up:

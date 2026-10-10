@@ -7,6 +7,7 @@ import { exchangeCode } from "./openrouter";
 import { initApp, updateSettings } from "./store";
 import { resumePending } from "./synthesis";
 import { resumeStories } from "./stories";
+import { resumeVisuals } from "./visuals";
 import "./styles.css";
 
 /** Finish the OpenRouter sign-in when it redirects back with ?code=… */
@@ -30,6 +31,7 @@ async function boot() {
   await recoverInterrupted();
   void resumePending();
   void resumeStories();
+  void resumeVisuals();
   createRoot(document.getElementById("root")!).render(
     <StrictMode>
       <App />

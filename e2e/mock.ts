@@ -249,6 +249,30 @@ export async function mockOpenRouter(page: Page, opts: MockOptions = {}): Promis
         }));
       }
       if (systemText.startsWith("Draw the described scene")) return reply(SCENE_SVG);
+      const sentenceIds = [...userText.matchAll(/^\[(s\d+)\]/gm)].map((m) => m[1]);
+      if (systemText.includes("Arrange the numbered sentences")) {
+        // the last sentence is left unplaced on purpose: the app must put it under "Other details"
+        const placed = sentenceIds.slice(0, Math.max(1, sentenceIds.length - 1));
+        return reply(JSON.stringify({
+          title: "Why the sky is blue",
+          levels: [
+            { name: "Science", about: "How nature works, tested by observation.", siblings: ["Arts", "Mathematics", "History", "Philosophy", "Law"] },
+            { name: "Physics", about: "Matter, energy and their laws.", siblings: ["Chemistry", "Biology"] },
+            { name: "Optics", about: "How light behaves.", siblings: ["Acoustics"] },
+          ],
+          groups: [{ id: "g1", title: "Premises", parent: null }],
+          items: placed.map((id, i) => ({ id, group: "g1", kind: i === 0 ? "foundation" : i === placed.length - 1 ? "conclusion" : "step", label: `Label ${id}`, from: i ? [placed[i - 1]] : [] })),
+        }));
+      }
+      if (systemText.includes("Turn the numbered sentences below into the requested diagram")) {
+        const [a, b, c] = [sentenceIds[0], sentenceIds[1] ?? sentenceIds[0], sentenceIds[2] ?? sentenceIds[0]];
+        if (systemText.includes("a comparison table"))
+          return reply(JSON.stringify({ columns: [{ id: "x", title: "First", sources: [a] }, { id: "y", title: "Second", sources: [b] }], rows: [{ label: "Says", cells: [{ column: "x", text: "one thing", sources: [a] }, { column: "y", text: "another", sources: [b] }] }] }));
+        if (systemText.includes("a concept map"))
+          return reply(JSON.stringify({ nodes: [{ id: "n1", label: "Premise one", sources: [a] }, { id: "n2", label: "Premise two", sources: [b] }, { id: "n3", label: "Conclusion", sources: [c, "s999"] }], edges: [{ from: "n1", to: "n2", label: "supports", sources: [b] }, { from: "n2", to: "n3", label: "leads to", sources: [c] }] }));
+        return reply(JSON.stringify({ steps: [{ label: "Start", detail: "", sources: [a] }] }));
+      }
+      if (userText.includes("list up to 8 more topics")) return reply(JSON.stringify({ names: ["Geology", "Astronomy", "Chemistry"] }));
       if (userText.includes("Describe the visual style")) return reply("Bold flat shapes in teal and orange on cream, thick outlines.");
       if (systemText.includes("Summarize the conversation")) return reply("We established that premise one is simple and premise two depends on it.");
       if (systemText.includes("Respond with JSON only, matching: { title")) {

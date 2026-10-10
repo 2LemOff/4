@@ -1,6 +1,6 @@
 import type { MediaKind } from "./types";
 
-export type StoryScope = "answer" | "pyramid" | "branch";
+export type StoryScope = "answer" | "pyramid" | "branch" | "text";
 export type PictureType = "shapes" | "image" | "video";
 export type PartStatus = "pending" | "running" | "done" | "error";
 
@@ -33,6 +33,8 @@ export interface Story {
   cardId: string;
   scope: StoryScope;
   nodeIds?: string[];
+  /** scope "text": the exact words the story teaches (a selection) */
+  material?: string;
   title: string;
   scenario: string;
   style: string;

@@ -52,6 +52,8 @@ export interface AppSettings {
   systemPrompt: string;
   /** how NEW topics are answered: full text (the chat) or pyramid JSON (the old map) */
   answerFormat: AnswerFormat;
+  /** views (not the chat): lines shown before "Read more" */
+  readMoreLines: number;
   synthesis: SynthesisSettings;
   /** models that answered 400 to a mid-conversation effort update */
   blockedConfigUpdate: string[];
@@ -78,6 +80,7 @@ export const defaultAppSettings = (): AppSettings => ({
   modelSettings: {},
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
   answerFormat: "text",
+  readMoreLines: 4,
   synthesis: DEFAULT_SYNTHESIS,
   blockedConfigUpdate: [],
   backupReminderDays: 7,
