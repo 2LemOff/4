@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Sheet } from "./Sheet";
-import { modelsStore, useStore } from "../store";
-import { familyModels, PICKER_FAMILIES, priceLabel, type PickerFamily } from "../models";
+import { modelsStore, refreshModels, useStore } from "../store";
+import { familyModels, isNewModel, PICKER_FAMILIES, popularModels, priceLabel, type PickerFamily } from "../models";
 import { formatTokens } from "../context";
 import type { ModelInfo } from "../types";
 
@@ -25,10 +25,10 @@ export function ModelPicker({
   filter?: (m: ModelInfo) => boolean;
 }) {
   const store = useStore(modelsStore);
-  const { loading, error } = store;
+  const { loading, error, firstSeen, fetchedAt } = store;
   const models = useMemo(() => (filter ? store.models.filter(filter) : store.models), [store.models, filter]);
   const [open, setOpen] = useState(false);
-  const [family, setFamily] = useState<PickerFamily | "all">("gemini-pro");
+  const [family, setFamily] = useState<PickerFamily | "all" | "popular">("popular");
   const [q, setQ] = useState("");
 
   const list = useMemo(() => {
@@ -36,6 +36,7 @@ export function ModelPicker({
       const t = q.toLowerCase();
       return models.filter((m) => m.id.toLowerCase().includes(t) || (m.name ?? "").toLowerCase().includes(t)).slice(0, 40);
     }
+    if (family === "popular") return popularModels(models, 30);
     if (family === "all") return [...models].sort((a, b) => (b.created ?? 0) - (a.created ?? 0)).slice(0, 40);
     return familyModels(models, family, 8);
   }, [models, family, q]);
@@ -60,22 +61,35 @@ export function ModelPicker({
           <input className="input" placeholder="Search all models…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search models" />
           {!q && (
             <div className="chips" role="tablist">
+              <button role="tab" aria-selected={family === "popular"} className={`btn chip ${family === "popular" ? "on" : ""}`} onClick={() => setFamily("popular")}>
+                Popular
+              </button>
               {PICKER_FAMILIES.map((f) => (
                 <button key={f.id} role="tab" aria-selected={family === f.id} className={`btn chip ${family === f.id ? "on" : ""}`} onClick={() => setFamily(f.id)}>
                   {f.label}
                 </button>
               ))}
               <button role="tab" aria-selected={family === "all"} className={`btn chip ${family === "all" ? "on" : ""}`} onClick={() => setFamily("all")}>
-                All
+                Newest
               </button>
             </div>
           )}
+          <p className="muted small">
+            {family === "popular" && !q ? "Most used on OpenRouter right now. " : ""}
+            {fetchedAt ? `List updated ${new Date(fetchedAt).toLocaleString([], { dateStyle: "short", timeStyle: "short" })}. ` : ""}
+            <button className="btn chip small-chip" disabled={loading} onClick={() => void refreshModels(true)}>
+              {loading ? "Updating…" : "Update now"}
+            </button>
+          </p>
           {loading && <p className="muted">Loading models…</p>}
           {error && <p className="error">Couldn’t load the model list: {error}</p>}
           {!loading && !models.length && !error && <p className="muted">No models loaded yet.</p>}
           {list.map((m) => (
             <button key={m.id} className={`row-btn ${m.id === value ? "on" : ""}`} onClick={() => pick(m.id)}>
-              <strong>{shortName(m.id)}</strong>
+              <strong>
+                {shortName(m.id)}
+                {isNewModel(m.id, firstSeen) && <span className="vbadge new-badge">new</span>}
+              </strong>
               <span className="muted small">
                 {m.context_length ? `${formatTokens(m.context_length)} context · ` : ""}
                 {priceLabel(m)}

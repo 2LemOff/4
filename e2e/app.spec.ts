@@ -207,6 +207,20 @@ test.describe("model settings", () => {
     await page.getByRole("button", { name: new RegExp(search, "i") }).first().click();
   }
 
+  test("the picker opens on the most used models, in OpenRouter's order, and can update the list", async ({ page }) => {
+    await mockOpenRouter(page);
+    await connect(page);
+    await page.getByRole("button", { name: "Model settings" }).click();
+    await page.getByRole("button", { name: /Model for this question/ }).click();
+    const picker = page.getByRole("dialog", { name: "Model for this question" });
+    await expect(picker.getByRole("tab", { name: "Popular" })).toHaveAttribute("aria-selected", "true");
+    await expect(picker.locator(".row-btn strong")).toHaveText(["gemini-3.5-pro", "gemini-3.6-flash", "claude-sonnet-5.5", "claude-opus-5.5", "grok-4.5", "gpt-5.6-sol"]);
+    await picker.getByRole("tab", { name: "Gemini", exact: true }).click();
+    await expect(picker.locator(".row-btn strong")).toHaveText(["gemini-3.5-pro"]);
+    await picker.getByRole("button", { name: "Update now" }).click();
+    await expect(picker.getByText(/List updated/)).toBeVisible();
+  });
+
   test("each model shows only the controls it supports", async ({ page }) => {
     await mockOpenRouter(page);
     await connect(page);

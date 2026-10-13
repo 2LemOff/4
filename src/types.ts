@@ -20,6 +20,8 @@ export interface ModelInfo {
   architecture?: { output_modalities?: string[]; input_modalities?: string[] };
   /** speech models: the voices this model accepts */
   supported_voices?: string[];
+  /** position in OpenRouter's list (it lists the most used models first) */
+  rank?: number;
 }
 
 export interface ReasoningSettings {

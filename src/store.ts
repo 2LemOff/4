@@ -2,6 +2,7 @@ import type { BranchMode } from "./panes";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { liveQuery } from "dexie";
 import { kvGet, kvSet } from "./db";
+import { updateFirstSeen } from "./models";
 import type { ModelInfo, ModelSettings, SynthesisSettings } from "./types";
 import { DEFAULT_SYNTHESIS, DEFAULT_SYSTEM_PROMPT, migrateSystemPrompt, type AnswerFormat } from "./prompts";
 import { listModels } from "./openrouter";
@@ -123,15 +124,19 @@ export interface ModelsState {
   loading: boolean;
   error?: string;
   fetchedAt?: number;
+  /** when each model id first appeared (for the "new" badge) */
+  firstSeen?: Record<string, number>;
 }
 export const modelsStore = createStore<ModelsState>({ models: [], embedModels: [], loading: false });
 
-const DAY = 24 * 3600 * 1000;
+/** New models appear within hours: the list is reloaded this often (and when the app comes back to the screen). */
+export const MODELS_TTL = 6 * 3600 * 1000;
 
 export async function refreshModels(force = false) {
   const cur = modelsStore.get();
   // a cache from before speech models were listed (or whose speech list failed) is refreshed now
-  if (!force && cur.models.length && cur.fetchedAt && Date.now() - cur.fetchedAt < DAY && cur.speechModels?.length) return;
+  if (!force && cur.models.length && cur.fetchedAt && Date.now() - cur.fetchedAt < MODELS_TTL && cur.speechModels?.length) return;
+  if (cur.loading) return;
   modelsStore.set({ ...cur, loading: true, error: undefined });
   try {
     const [models, embedModels, speechModels] = await Promise.all([
@@ -139,7 +144,8 @@ export async function refreshModels(force = false) {
       listModels("embeddings").catch(() => []),
       listModels("speech").catch(() => []),
     ]);
-    const next = { models, embedModels, speechModels, loading: false, fetchedAt: Date.now() };
+    const firstSeen = updateFirstSeen(cur.firstSeen ?? (cur.models.length ? Object.fromEntries(cur.models.map((m) => [m.id, 0])) : undefined), models.map((m) => m.id));
+    const next = { models, embedModels, speechModels, loading: false, fetchedAt: Date.now(), firstSeen };
     modelsStore.set(next);
     await kvSet("models", next);
   } catch (e) {
@@ -174,4 +180,8 @@ export async function initApp() {
   const cached = await kvGet<ModelsState>("models");
   if (cached) modelsStore.set({ ...cached, loading: false });
   void refreshModels();
+  // a phone app stays open for days: check again whenever it comes back to the screen
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") void refreshModels();
+  });
 }

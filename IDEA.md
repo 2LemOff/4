@@ -205,7 +205,7 @@ Edit it in **Settings › System prompt**, where each rule has a switch and you 
 
 ## Models and settings (OpenRouter)
 
-Fractal talks to [OpenRouter](https://openrouter.ai): Gemini Pro and Flash, Grok, the ChatGPT tiers, and Claude Opus, Fable and Sonnet. The model list is loaded live.
+Fractal talks to [OpenRouter](https://openrouter.ai): Gemini (every top model, whatever its name) and Flash, Grok, the ChatGPT tiers, and Claude Opus, Fable and Sonnet. The model list is loaded live and refreshed every few hours and whenever the app comes back to the screen (**Update now** in the picker does it at once). The picker opens on **Popular**, the models most used on OpenRouter right now in its own order; models that appeared in the last week show **new**. A new top Gemini becomes the default answer model by itself unless you chose one.
 
 **Settings › Models lists every place a model is used**, grouped, and each opens the same editor:
 - **Chat:** answers, quick answers, quick check, claim check

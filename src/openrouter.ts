@@ -137,7 +137,8 @@ export async function listModels(output: "text" | "embeddings" | "speech" | "vid
   const res = await fetch(url);
   if (!res.ok) throw await failure(res);
   const j = await res.json();
-  return (j.data ?? []) as ModelInfo[];
+  // the list comes most used first: keep that order as the popularity rank
+  return ((j.data ?? []) as ModelInfo[]).map((m, rank) => ({ ...m, rank }));
 }
 
 export async function streamChat(opts: {

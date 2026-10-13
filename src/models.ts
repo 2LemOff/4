@@ -10,7 +10,7 @@ export type PickerFamily =
   | "claude-sonnet";
 
 export const PICKER_FAMILIES: { id: PickerFamily; label: string }[] = [
-  { id: "gemini-pro", label: "Gemini Pro" },
+  { id: "gemini-pro", label: "Gemini" },
   { id: "gemini-flash", label: "Gemini Flash" },
   { id: "grok", label: "Grok" },
   { id: "openai", label: "ChatGPT" },
@@ -22,7 +22,8 @@ export const PICKER_FAMILIES: { id: PickerFamily; label: string }[] = [
 const NOISE = /image|audio|tts|embed|live|vision|search|moderation|customtools|:free|:extended|:thinking/i;
 
 const MATCH: Record<PickerFamily, (m: ModelInfo) => boolean> = {
-  "gemini-pro": (m) => /^google\/gemini-.*pro/.test(m.id) && !NOISE.test(m.id),
+  // every top Gemini, whatever its name (Pro, Ultra, a code name like "Argon"…); Flash, Lite and Nano are smaller tiers
+  "gemini-pro": (m) => /^google\/gemini-/.test(m.id) && !/flash|lite|nano|gemma/.test(m.id) && !NOISE.test(m.id),
   "gemini-flash": (m) => /^google\/gemini-.*flash/.test(m.id) && !/lite/.test(m.id) && !NOISE.test(m.id),
   grok: (m) => /^x-ai\/grok/.test(m.id) && !/code/.test(m.id) && !NOISE.test(m.id),
   openai: (m) =>
@@ -44,6 +45,30 @@ const isVariant = (m: ModelInfo) => m.id.includes(":");
 /** The newest models of a picker family, newest first. */
 export function familyModels(models: ModelInfo[], family: PickerFamily, limit = 6): ModelInfo[] {
   return models.filter((m) => isText(m) && !isVariant(m) && MATCH[family](m)).sort(newestFirst).slice(0, limit);
+}
+
+/**
+ * The most used models right now, in OpenRouter's own order (its list puts the most used first), so the list
+ * follows what people actually use as it changes. Text models only, no `:free`/`:batch` variants.
+ */
+export function popularModels(models: ModelInfo[], limit = 30): ModelInfo[] {
+  return models
+    .filter((m) => isText(m) && !isVariant(m) && !NOISE.test(m.id))
+    .sort((a, b) => (a.rank ?? Infinity) - (b.rank ?? Infinity))
+    .slice(0, limit);
+}
+
+/** Models that appeared in the list during the last `days` days (`firstSeen` comes from earlier refreshes). */
+export function isNewModel(id: string, firstSeen: Record<string, number> | undefined, now = Date.now(), days = 7): boolean {
+  const t = firstSeen?.[id];
+  return !!t && now - t < days * 24 * 3600 * 1000;
+}
+
+/** Remember when each model first appeared; on the very first load nothing counts as new. */
+export function updateFirstSeen(prev: Record<string, number> | undefined, ids: string[], now = Date.now()): Record<string, number> {
+  const next: Record<string, number> = { ...prev };
+  for (const id of ids) if (!(id in next)) next[id] = prev && Object.keys(prev).length ? now : 0;
+  return next;
 }
 
 export function newestOf(models: ModelInfo[], family: PickerFamily): ModelInfo | undefined {

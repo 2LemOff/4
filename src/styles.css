@@ -536,3 +536,4 @@ mark.hl.src[data-n]::after { color: var(--found, var(--accent)); }
   .chat-wrap.mode-split.has-branch > .chat { flex: 1 1 50%; min-width: 0; }
   .chat-wrap.mode-split.has-branch > .branch-host.split { flex: 1 1 50%; min-width: 0; border-top: none; border-left: 2px solid var(--accent); }
 }
+.new-badge { margin-left: 6px; vertical-align: middle; }
