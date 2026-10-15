@@ -52,19 +52,38 @@ export async function buildBackup(opts: { includeVideos: boolean; settings?: App
 
 export const backupName = (d = new Date()) => `fractal-backup-${d.toISOString().slice(0, 10)}.zip`;
 
-/** Open Android's share sheet (save to Drive, Files…), or download when sharing files isn't available. */
-export async function shareOrDownload(zip: Uint8Array, name = backupName()): Promise<"shared" | "downloaded"> {
-  const file = new File([zip.slice().buffer], name, { type: "application/zip" });
-  if (navigator.canShare?.({ files: [file] })) {
-    await navigator.share({ files: [file], title: "Fractal backup" });
-    return "shared";
-  }
+export const backupFile = (zip: Uint8Array, name = backupName()) => new File([zip.slice().buffer], name, { type: "application/zip" });
+
+/** Save the file through a download (works without the share menu). */
+export function downloadFile(file: File) {
   const url = URL.createObjectURL(file);
   const a = document.createElement("a");
   a.href = url;
-  a.download = name;
+  a.download = file.name;
+  document.body.appendChild(a);
   a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+/** The share menu needs a fresh tap: browsers refuse it ("Permission denied") once building the zip took a while. */
+const refused = (e: unknown) => e instanceof DOMException && (e.name === "NotAllowedError" || e.name === "SecurityError");
+
+/**
+ * Open Android's share sheet (save to Drive, Files…). When the browser can't share files, or refuses because the
+ * tap is too long ago, the backup is downloaded instead, so it is never lost.
+ */
+export async function shareOrDownload(file: File): Promise<"shared" | "downloaded" | "cancelled"> {
+  if (navigator.canShare?.({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: "Fractal backup" });
+      return "shared";
+    } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") return "cancelled";
+      if (!refused(e)) throw e;
+    }
+  }
+  downloadFile(file);
   return "downloaded";
 }
 

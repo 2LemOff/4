@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { mockOpenRouter } from "./mock";
-import { askDock, askRootMap, connect, item, usePyramids } from "./helpers";
+import { askDock, askRoot, askRootMap, connect, item, usePyramids } from "./helpers";
 
 const center = async (page: Page, id: string) => {
   const b = (await item(page, id).boundingBox())!;
@@ -395,6 +395,29 @@ test.describe("storage and backup", () => {
     await p2.getByRole("button", { name: /^Why is the sky blue/ }).click();
     await expect(p2.locator(".msg-ai .answer-text")).toContainText("What you see depends on where you stand.");
     await fresh.close();
+  });
+
+  test("backup still saves when the browser refuses the share menu (Permission denied)", async ({ page }) => {
+    // like Vivaldi/Chrome on Android once building the zip took longer than the tap allows
+    await page.addInitScript(() => {
+      (navigator as any).canShare = () => true;
+      (navigator as any).share = () => Promise.reject(new DOMException("Permission denied", "NotAllowedError"));
+    });
+    await mockOpenRouter(page);
+    await connect(page);
+    await askRoot(page, "Why is the sky blue?");
+    await page.goto("/#/settings/storage");
+    const download = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Back up", exact: true }).click();
+    const file = await download;
+    expect(file.suggestedFilename()).toMatch(/^fractal-backup-\d{4}-\d{2}-\d{2}\.zip$/);
+    await expect(page.getByText(/Backup saved to your Downloads/)).toBeVisible();
+    await expect(page.getByText("Permission denied")).toHaveCount(0);
+    await expect(page.getByText(/Last backup:/)).toBeVisible();
+    // the finished backup can be saved again with a fresh tap
+    const again = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Save to phone" }).click();
+    expect((await again).suggestedFilename()).toBe(file.suggestedFilename());
   });
 
   test("an old v1 text answer still opens, shown as a chain", async ({ page }) => {

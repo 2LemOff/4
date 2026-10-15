@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { db } from "../db";
-import { buildBackup, restoreBackup, shareOrDownload } from "../backup";
+import { backupFile, buildBackup, downloadFile, restoreBackup, shareOrDownload } from "../backup";
 import { deleteMedia, deleteTopics, estimate, formatBytes, isPersisted, requestPersist, usageBreakdown, type FileInfo, type TopicUsage } from "../storage";
 import { settingsStore, updateSettings, useStore } from "../store";
 
@@ -9,6 +9,7 @@ const KIND_LABEL = { audio: "Voice", image: "Image", video: "Video" } as const;
 export function StorageSettings() {
   const s = useStore(settingsStore);
   const [persisted, setPersisted] = useState<boolean | undefined>();
+  const [ready, setReady] = useState<File>();
   const [est, setEst] = useState<{ usage?: number; quota?: number }>({});
   const [usage, setUsage] = useState<{ topics: TopicUsage[]; files: FileInfo[] } | null>(null);
   const [pickTopics, setPickTopics] = useState<Set<string>>(new Set());
@@ -38,16 +39,26 @@ export function StorageSettings() {
   };
   const selectKind = (kind: FileInfo["kind"]) => setPickFiles(new Set([...pickFiles, ...(usage?.files.filter((f) => f.kind === kind).map((f) => f.id) ?? [])]));
 
+  // the finished backup stays here, so Share / Save to phone work with a fresh tap
+  const send = async (file: File, how: "share" | "save") => {
+    try {
+      const r = how === "save" ? (downloadFile(file), "downloaded" as const) : await shareOrDownload(file);
+      if (r === "cancelled") return setMsg(`Backup ready (${formatBytes(file.size)}). Tap Share or Save to phone.`);
+      updateSettings({ lastBackupAt: Date.now() });
+      setMsg(r === "shared" ? `Backup shared (${formatBytes(file.size)}).` : `Backup saved to your Downloads as ${file.name} (${formatBytes(file.size)}).`);
+    } catch (e) {
+      setMsg(`Couldn't share the backup (${e instanceof Error ? e.message : String(e)}). Tap Save to phone instead.`);
+    }
+  };
   const backup = async () => {
     setBusy(true);
     setMsg("");
     try {
-      const zip = await buildBackup({ includeVideos, settings: settingsStore.get() });
-      const how = await shareOrDownload(zip);
-      updateSettings({ lastBackupAt: Date.now() });
-      setMsg(`${how === "shared" ? "Backup shared" : "Backup downloaded"} (${formatBytes(zip.byteLength)}).`);
+      const file = backupFile(await buildBackup({ includeVideos, settings: settingsStore.get() }));
+      setReady(file);
+      await send(file, "share");
     } catch (e) {
-      if (!(e instanceof DOMException && e.name === "AbortError")) setMsg(e instanceof Error ? e.message : String(e));
+      setMsg(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
@@ -87,6 +98,12 @@ export function StorageSettings() {
       </label>
       <div className="chips">
         <button className="btn primary sm" onClick={backup} disabled={busy}>{busy ? "Preparing…" : "Back up"}</button>
+        {ready && !busy && (
+          <>
+            <button className="btn sm" onClick={() => void send(ready, "share")}>Share…</button>
+            <button className="btn sm" onClick={() => void send(ready, "save")}>Save to phone</button>
+          </>
+        )}
         <label className="btn sm">
           Restore
           <input type="file" accept=".zip,application/zip,application/json" hidden onChange={(e) => e.target.files?.[0] && restore(e.target.files[0])} />
