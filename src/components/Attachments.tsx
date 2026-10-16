@@ -1,6 +1,29 @@
 import { useRef, useState, type ChangeEvent, type PointerEvent } from "react";
+import { clock } from "../videoCost";
 import { Icon } from "./Icon";
 import { Sheet } from "./Sheet";
+
+/** A video waiting to be sent: a file (with its length and still frames) or a link. */
+export interface AttachedVideo {
+  key: string;
+  file?: Blob;
+  link?: string;
+  seconds?: number;
+  frames: Blob[];
+  /** object URL of the first frame, for the thumbnail */
+  poster?: string;
+}
+
+/** A link a model can be given as a video (YouTube or any public http(s) address). */
+export function videoLink(text: string): string | undefined {
+  const t = text.trim();
+  try {
+    const u = new URL(t);
+    return u.protocol === "https:" || u.protocol === "http:" ? u.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 /** A picture waiting to be sent with the next question. */
 export interface Attached {
@@ -29,9 +52,10 @@ export function attachedLabels(list: Attached[]): Map<string, string> {
   return new Map(list.map((a) => [a.key, a.partOf ? `Part of picture ${n.get(a.partOf) ?? "?"}` : `Picture ${n.get(a.key)}`]));
 }
 
-/** Take a photo, pick photos or screenshots, choose a file, or paste a copied picture. */
-export function AttachSheet({ onFiles, onClose }: { onFiles: (files: Blob[]) => void; onClose: () => void }) {
+/** Take a photo or a video, pick photos, screenshots or videos, choose a file, paste a picture, or add a video link. */
+export function AttachSheet({ onFiles, onLink, onClose }: { onFiles: (files: Blob[]) => void; onLink?: (url: string) => void; onClose: () => void }) {
   const [err, setErr] = useState("");
+  const [link, setLink] = useState("");
   const pick = (e: ChangeEvent<HTMLInputElement>) => {
     const files = [...(e.target.files ?? [])];
     e.target.value = "";
@@ -55,7 +79,7 @@ export function AttachSheet({ onFiles, onClose }: { onFiles: (files: Blob[]) => 
     }
   };
   return (
-    <Sheet title="Add a picture" onClose={onClose}>
+    <Sheet title="Add a picture or video" onClose={onClose}>
       <label className="row-btn">
         <span className="row-line"><Icon name="camera" size={16} /> Take a photo</span>
         <input type="file" accept="image/*" capture="environment" hidden onChange={pick} />
@@ -65,14 +89,37 @@ export function AttachSheet({ onFiles, onClose }: { onFiles: (files: Blob[]) => 
         <input type="file" accept="image/*" multiple hidden onChange={pick} />
       </label>
       <label className="row-btn">
+        <span className="row-line"><Icon name="video" size={16} /> Record a video</span>
+        <input type="file" accept="video/*" capture="environment" hidden onChange={pick} />
+      </label>
+      <label className="row-btn">
+        <span className="row-line"><Icon name="video" size={16} /> Videos</span>
+        <input type="file" accept="video/*" multiple hidden onChange={pick} />
+      </label>
+      <label className="row-btn">
         <span className="row-line"><Icon name="file" size={16} /> From files</span>
         <input type="file" multiple hidden onChange={pick} />
       </label>
       <button className="row-btn" onClick={paste}>
         <span className="row-line"><Icon name="paste" size={16} /> Paste a copied picture</span>
       </button>
+      {onLink && (
+        <form
+          className="composer-row"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const url = videoLink(link);
+            if (!url) return setErr("That isn't a web address.");
+            onLink(url);
+            onClose();
+          }}
+        >
+          <input className="input grow" value={link} onChange={(e) => setLink(e.target.value)} placeholder="Or paste a YouTube link" aria-label="Video link" inputMode="url" />
+          <button className="btn sm" type="submit" disabled={!link.trim()}>Add link</button>
+        </form>
+      )}
       {err && <p className="error small" role="alert">{err}</p>}
-      <p className="muted small">Pictures are made smaller before sending and stay on this phone. To ask about one part, tap the box button on its thumbnail.</p>
+      <p className="muted small">Pictures are made smaller before sending and stay on this phone. To ask about one part, tap the box button on its thumbnail. Videos up to 20 MB are sent whole to models that can watch them; others see a few still frames.</p>
     </Sheet>
   );
 }
@@ -155,5 +202,28 @@ export function ImageRegion({ src, onDone, onClose }: { src: string; onDone: (bo
         <button className="btn primary grow" disabled={!big} onClick={() => box && onDone(box)}>Use this part</button>
       </div>
     </Sheet>
+  );
+}
+
+/** The videos to send, each with its length and what it costs with the chosen model. */
+export function AttachedVideos({ list, cost, onRemove }: { list: AttachedVideo[]; cost: (v: AttachedVideo) => string; onRemove: (key: string) => void }) {
+  return (
+    <div className="attached-videos" role="group" aria-label="Videos to send">
+      {list.map((v, i) => (
+        <div key={v.key} className="vid-att">
+          <figure className="att">
+            {v.poster ? <img src={v.poster} alt={`Video ${i + 1}`} /> : <span className="vid-link" role="img" aria-label={`Video ${i + 1}`}><Icon name="play" size={20} /></span>}
+            <span className="att-dur">{v.link ? "link" : clock(v.seconds)}</span>
+            <button type="button" className="btn icon att-btn att-x" aria-label={`Remove video ${i + 1}`} onClick={() => onRemove(v.key)}>
+              <Icon name="close" size={14} />
+            </button>
+          </figure>
+          <span className="small vid-cost" role="status">
+            <strong>Video {i + 1}</strong>
+            {v.link ? ` · ${new URL(v.link).host}` : v.seconds ? ` · ${clock(v.seconds)}` : ""} · {cost(v)}
+          </span>
+        </div>
+      ))}
+    </div>
   );
 }

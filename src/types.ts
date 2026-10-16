@@ -14,7 +14,7 @@ export interface ModelInfo {
   name?: string;
   created?: number;
   context_length?: number;
-  pricing?: { prompt?: string; completion?: string };
+  pricing?: { prompt?: string; completion?: string; /** per input image, when the model prices images separately */ image?: string };
   supported_parameters?: string[];
   reasoning?: ModelReasoningInfo;
   architecture?: { output_modalities?: string[]; input_modalities?: string[] };
@@ -22,6 +22,8 @@ export interface ModelInfo {
   supported_voices?: string[];
   /** position in OpenRouter's list (it lists the most used models first) */
   rank?: number;
+  /** the main provider's limits (max_completion_tokens caps max_tokens) */
+  top_provider?: { context_length?: number | null; max_completion_tokens?: number | null };
 }
 
 export interface ReasoningSettings {
@@ -108,6 +110,18 @@ export interface CardImage {
   textError?: string;
 }
 
+/** A video sent with a question: the clip (in `media`) or a link, plus still frames for models that only see pictures. */
+export interface CardVideo {
+  /** the clip, kind "video" (absent for a link) */
+  mediaId?: string;
+  /** a YouTube or public video link instead of a file */
+  link?: string;
+  label: string;
+  seconds?: number;
+  /** media ids of still frames, in order */
+  frames?: string[];
+}
+
 export interface Card {
   id: string;
   sessionId: string;
@@ -140,6 +154,8 @@ export interface Card {
   fromVisual?: string;
   /** photos or screenshots sent with the question */
   images?: CardImage[];
+  /** videos sent with the question */
+  videos?: CardVideo[];
   createdAt: number;
 }
 

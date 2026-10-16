@@ -189,33 +189,63 @@ export function estimateImagePrice(pricing: unknown, params: Record<string, unkn
   return { min: Math.min(...outCosts) + refMin, max: Math.max(...outCosts) + refMax, basis };
 }
 
+/** How a `pricing_skus` key is billed. OpenRouter prices video per second of output unless a key says otherwise
+ * (e.g. `{ "generate": "0.50" }` on Veo 3.1 is $0.50 per second). */
+export function skuUnit(key: string): "second" | "clip" | "token" {
+  const k = key.toLowerCase();
+  if (/token/.test(k)) return "token";
+  if (/(per[-_ ]?(clip|request|generation)|per[-_ ]?video(?![-_ ]?second))/.test(k)) return "clip";
+  return "second";
+}
+/** Surcharges for what you send (reference images or video), not the price of the clip itself. */
+const isInputSku = (k: string) => /input|reference|\bref\b|edit/.test(k);
+
+const RES_PIXELS: Record<string, [number, number]> = { "480p": [854, 480], "540p": [960, 540], "720p": [1280, 720], "1080p": [1920, 1080], "1440p": [2560, 1440], "2k": [2560, 1440], "4k": [3840, 2160] };
+
 /**
- * Estimated cost of one clip from `pricing_skus` × duration. SKU names vary (per-video-second,
- * per-video-second-1080p, …), so they're matched by resolution and audio; otherwise a range is shown.
+ * Estimated cost of one clip from `pricing_skus` × duration. Most SKUs are per second (matched by resolution and
+ * audio when there are several; otherwise a range is shown). Token-priced models (e.g. Seedance) are estimated
+ * from the frame size: width × height × 24 fps × seconds / 1024 video tokens.
  */
 export function estimateVideoPrice(skus: Record<string, string | number> | null | undefined, opts: { duration?: number; resolution?: string; audio?: boolean }): PriceRange | undefined {
   if (!skus) return undefined;
-  const entries = Object.entries(skus)
+  const all = Object.entries(skus)
     .map(([k, v]) => [k.toLowerCase(), num(v)] as const)
     .filter((e): e is readonly [string, number] => e[1] !== undefined && e[1] > 0);
-  if (!entries.length) return undefined;
+  if (!all.length) return undefined;
+  const entries = all.some(([k]) => !isInputSku(k)) ? all.filter(([k]) => !isInputSku(k)) : all;
   const secs = opts.duration ?? 5;
-  const perSecond = entries.filter(([k]) => /second|\bsec\b|per_s\b/.test(k));
+  const res = opts.resolution?.toLowerCase();
+  const mentionsRes = (k: string) => /\d{3,4}p|\dk\b/.test(k);
+  const byRes = (list: (readonly [string, number])[]) =>
+    list.filter(([k]) => (res && k.includes(res)) || (!mentionsRes(k) && !(res && list.some(([x]) => x.includes(res)))));
+
+  const perSecond = entries.filter(([k]) => skuUnit(k) === "second");
   if (perSecond.length) {
-    const res = opts.resolution?.toLowerCase();
-    const mentionsRes = (k: string) => /\d{3,4}p|\dk\b/.test(k);
     const silent = (k: string) => /no[-_]?audio|without[-_]?audio|silent/.test(k);
     const withAudio = (k: string) => /audio/.test(k) && !silent(k);
-    let pick = perSecond.filter(([k]) => (res && k.includes(res)) || (!mentionsRes(k) && !(res && perSecond.some(([x]) => x.includes(res)))));
+    let pick = byRes(perSecond);
     if (opts.audio !== undefined) {
       // either "…-no-audio" SKUs (the plain one then includes audio) or "…-audio" SKUs (the plain one is silent)
       const audible = pick.some(([k]) => silent(k)) ? (k: string) => !silent(k) : withAudio;
       if (pick.some(([k]) => audible(k)) && pick.some(([k]) => !audible(k))) pick = pick.filter(([k]) => audible(k) === opts.audio);
     }
-    if (pick.length === 1) return { min: pick[0][1] * secs, max: pick[0][1] * secs, basis: `${pick[0][0]} × ${secs} s` };
+    const named = (k: string) => (/second/.test(k) ? k : `${k} (per second)`);
+    if (pick.length === 1) return { min: pick[0][1] * secs, max: pick[0][1] * secs, basis: `${named(pick[0][0])} × ${secs} s` };
     const vals = (pick.length ? pick : perSecond).map(([, v]) => v * secs);
     return { min: Math.min(...vals), max: Math.max(...vals), basis: `per second × ${secs} s (range, see details)` };
   }
+
+  const perToken = entries.filter(([k]) => skuUnit(k) === "token");
+  if (perToken.length) {
+    const [w, h] = RES_PIXELS[res ?? "720p"] ?? RES_PIXELS["720p"];
+    const tokens = Math.round((w * h * 24 * secs) / 1024);
+    // a price above $0.001 is per million tokens, below it per token
+    const vals = byRes(perToken).map(([, v]) => tokens * (v >= 0.001 ? v / 1e6 : v));
+    const list = vals.length ? vals : perToken.map(([, v]) => tokens * (v >= 0.001 ? v / 1e6 : v));
+    return { min: Math.min(...list), max: Math.max(...list), basis: `about ${tokens.toLocaleString("en-US")} video tokens (${res ?? "720p"}, ${secs} s)` };
+  }
+
   const vals = entries.map(([, v]) => v);
   return { min: Math.min(...vals), max: Math.max(...vals), basis: vals.length > 1 ? "per clip (range, see details)" : "per clip" };
 }

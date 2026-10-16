@@ -30,7 +30,7 @@ import { Sheet } from "../components/Sheet";
 import { StoryStartSheet } from "../components/StoryStartSheet";
 import { VisualizeSheet } from "../components/VisualizeSheet";
 import { CheckNotes, QuickNotes, QuickSheet } from "../components/QuickViews";
-import { ImageTexts, MessageThumbs, PictureSheet } from "../components/MessageImages";
+import { ImageTexts, MessageThumbs, PictureSheet, VideoSheet } from "../components/MessageImages";
 import type { Box } from "../components/Attachments";
 import { startClaimCheck } from "../quick";
 import type { ClaimCheck, Quick } from "../types";
@@ -109,6 +109,7 @@ export function ChatScreen({ sid, focus, find, quote, ask, branch }: { sid: stri
   const [councilSheet, setCouncilSheet] = useState(false);
   const [forceModel, setForceModel] = useState<{ id: string; n: number }>();
   const [picture, setPicture] = useState<{ cardId: string; i: number }>();
+  const [video, setVideo] = useState<{ cardId: string; i: number }>();
   const [addPicture, setAddPicture] = useState<{ blob: Blob; box: Box; n: number }>();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const { sel, clear: clearSel, press, release } = useAnswerSelection();
@@ -449,6 +450,7 @@ export function ChatScreen({ sid, focus, find, quote, ask, branch }: { sid: stri
         marks={marksByCard.get(c.id) ?? NO_MARKS}
         partMarks={(part) => marksByCard.get(markKey(c.id, part)) ?? NO_MARKS}
         onPicture={(i) => setPicture({ cardId: c.id, i })}
+        onVideo={(i) => setVideo({ cardId: c.id, i })}
         onOpen={open}
         find={c.id === focus ? flash : undefined}
         onMenu={setAnswerMenu}
@@ -792,6 +794,7 @@ export function ChatScreen({ sid, focus, find, quote, ask, branch }: { sid: stri
           onClose={() => setPicture(undefined)}
         />
       )}
+      {video && idx.get(video.cardId) && <VideoSheet card={idx.get(video.cardId)!} i={video.i} onClose={() => setVideo(undefined)} />}
       {storyFor && <StoryStartSheet sessionId={sid} cardId={storyFor} onClose={() => setStoryFor(undefined)} />}
       {quickOpen && <QuickSheet sessionId={sid} quickId={quickOpen.id} draft={quickOpen.draft} onClose={() => setQuickOpen(undefined)} />}
       {visualize && <VisualizeSheet sessionId={sid} cardId={visualize.cardId} scope={visualize.scope} onClose={() => setVisualize(undefined)} />}
@@ -833,6 +836,7 @@ function Turn({
   marks,
   partMarks,
   onPicture,
+  onVideo,
   find,
   onMenu,
   visuals,
@@ -853,6 +857,7 @@ function Turn({
   /** highlights in the text read from the question's pictures */
   partMarks: (part: string) => AnswerMark[];
   onPicture: (i: number) => void;
+  onVideo: (i: number) => void;
   find?: string;
   onMenu: (id: string) => void;
   visuals: number;
@@ -872,7 +877,7 @@ function Turn({
   return (
     <section className="turn">
       <div className="msg-user" data-card-id={card.id}>
-        {card.images?.length ? <MessageThumbs card={card} onOpen={onPicture} /> : null}
+        {card.images?.length || card.videos?.length ? <MessageThumbs card={card} onOpen={onPicture} onVideo={onVideo} /> : null}
         {quotes.map((q, k) => (
           <p key={k} className="quote-line">{q}</p>
         ))}
@@ -919,6 +924,7 @@ function Turn({
             </button>
             <span className="muted small ellipsis">
               {shortName(card.model)}
+              {card.effortUsed ? ` · ${card.effortUsed} thinking` : ""}
               {card.usage?.cost !== undefined ? ` · $${card.usage.cost.toFixed(4)}` : ""}
             </span>
           </div>

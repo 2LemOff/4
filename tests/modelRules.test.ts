@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildRequestParams, familyOf, resolveReasoning, settingsControls } from "../src/modelRules";
+import { buildRequestParams, familyOf, resolveReasoning, settingsControls, withAnswerThinking } from "../src/modelRules";
 import type { ModelSettings } from "../src/types";
 import { claude, claudeTemp, gemini, gpt, grok, plain } from "./fixtures";
 
@@ -34,6 +34,28 @@ describe("settingsControls", () => {
   it("null supported_efforts means every gateway value except none", () => {
     const m = { ...grok, reasoning: { supported_efforts: null } };
     expect(settingsControls(m).reasoning.efforts).toEqual(["max", "xhigh", "high", "medium", "low", "minimal"]);
+  });
+  it("a new reasoning model listed without its levels (e.g. Gemini 4 Argon) still offers them, up to high", () => {
+    const argon = { id: "google/gemini-4-argon", supported_parameters: ["max_tokens", "reasoning", "include_reasoning"], top_provider: { max_completion_tokens: 65536 } };
+    const c = settingsControls(argon);
+    expect(c.reasoning.available).toBe(true);
+    expect(c.reasoning.efforts).toEqual(["high", "medium", "low", "minimal"]);
+    expect(c.reasoning.canDisable).toBe(false);
+    const body = buildRequestParams(S({ effort: "high" }), argon);
+    expect(body.reasoning).toEqual({ effort: "high" });
+    expect(body.max_tokens).toBe(32768);
+    // a reasoning object without an effort list gets the family's levels too
+    expect(settingsControls({ ...argon, reasoning: { default_effort: "medium" } }).reasoning.efforts).toEqual(["high", "medium", "low", "minimal"]);
+  });
+  it("answers think at the chosen level unless the model's own settings choose", () => {
+    expect(withAnswerThinking(S(), gemini, "high").reasoning.effort).toBe("high");
+    expect(withAnswerThinking(S(), grok, "medium").reasoning.effort).toBe("high");
+    expect(withAnswerThinking(S(), claude, "highest").reasoning.effort).toBe("max");
+    expect(withAnswerThinking(S({ effort: "low" }), gemini, "high").reasoning.effort).toBe("low");
+    expect(withAnswerThinking(S({ enabled: false }), grok, "high").reasoning.effort).toBeUndefined();
+    expect(withAnswerThinking(S({ budget: 4000 }), claude, "high").reasoning.effort).toBeUndefined();
+    expect(withAnswerThinking(S(), plain, "high").reasoning.effort).toBeUndefined();
+    expect(withAnswerThinking(S(), gemini, "default").reasoning.effort).toBeUndefined();
   });
   it("hides the off switch when reasoning is mandatory", () => {
     expect(settingsControls(gemini).reasoning.canDisable).toBe(false);

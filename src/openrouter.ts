@@ -104,11 +104,18 @@ export function applyChunk(state: StreamState, data: string): StreamState {
  */
 export function prepareMessages(model: string, messages: ChatMessage[]): unknown[] {
   const claude = familyOf(model) === "claude";
-  if (!claude && !messages.some((m) => m.images?.length)) return messages;
+  if (!claude && !messages.some((m) => m.images?.length || m.videos?.length)) return messages;
   return messages.map((m, i) => {
-    if (m.images?.length) {
-      const { images, ...rest } = m;
-      return { ...rest, content: [{ type: "text", text: m.content }, ...images.map((url) => ({ type: "image_url", image_url: { url } }))] };
+    if (m.images?.length || m.videos?.length) {
+      const { images, videos, ...rest } = m;
+      return {
+        ...rest,
+        content: [
+          { type: "text", text: m.content },
+          ...(images ?? []).map((url) => ({ type: "image_url", image_url: { url } })),
+          ...(videos ?? []).map((url) => ({ type: "video_url", video_url: { url } })),
+        ],
+      };
     }
     if (claude && i === 0 && m.role === "system" && m.content) return { ...m, content: [{ type: "text", text: m.content, cache_control: { type: "ephemeral" } }] };
     return m;

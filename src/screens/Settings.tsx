@@ -108,6 +108,20 @@ function Models() {
             <>
               <PromptSettings embedded />
               <fieldset className="field">
+                <legend className="small">How answers think</legend>
+                <label className="small">
+                  Thinking{" "}
+                  <select className="input" value={s.answerThinking ?? "high"} onChange={(e) => updateSettings({ answerThinking: e.target.value as AppSettings["answerThinking"] })} aria-label="Thinking for answers">
+                    <option value="high">High (thinks longer, costs more)</option>
+                    <option value="highest">The highest the model offers</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low (fast and cheap)</option>
+                    <option value="default">The model's own default</option>
+                  </select>
+                </label>
+                <p className="muted small">Used for every answer unless you saved settings for a model (⚙ next to the question box). High thinking gets room for long answers automatically.</p>
+              </fieldset>
+              <fieldset className="field">
                 <legend className="small">When you ask about highlighted words</legend>
                 <label className="small">
                   The branch opens as{" "}

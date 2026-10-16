@@ -37,6 +37,7 @@ const PATHS: Record<string, string> = {
   crop: "M7 3v14h14M3 7h14v14",
   text: "M5 7V5h14v2M12 5v14M9 19h6",
   attach: "M12 5v14M5 12h14",
+  video: "M3 6h13v12H3zM16 10l5-3v10l-5-3",
   split: "M4 4h16v16H4zM4 12h16",
   bubble: "M4 5h16v10h-9l-5 4v-4H4z",
   layer: "M12 3 2 8l10 5 10-5zM2 13l10 5 10-5",

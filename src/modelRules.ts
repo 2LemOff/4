@@ -1,4 +1,4 @@
-import { ALL_EFFORTS, type Effort, type ModelInfo, type ModelSettings } from "./types";
+import { ALL_EFFORTS, type Effort, type ModelInfo, type ModelReasoningInfo, type ModelSettings } from "./types";
 import {
   isGpt56Plus,
   requestMaxTokens,
@@ -47,6 +47,36 @@ export interface SettingsControls {
   hints: string[];
 }
 
+/** The usual effort levels of a family, for reasoning models listed without them (new models often are). */
+const FAMILY_EFFORTS: Record<Family, Effort[]> = {
+  gemini: ["high", "medium", "low", "minimal"],
+  claude: ["max", "xhigh", "high", "medium", "low"],
+  openai: ["xhigh", "high", "medium", "low"],
+  grok: ["high", "low"],
+  other: ["high", "medium", "low"],
+};
+
+/**
+ * A model's reasoning info. A model whose supported_parameters list reasoning but that comes without the
+ * `reasoning` object (or without its effort list) still reasons: it gets its family's usual levels, and Gemini
+ * reasoning is treated as always on.
+ */
+export function reasoningInfo(model: ModelInfo): ModelReasoningInfo | undefined {
+  const family = familyOf(model.id);
+  const r = model.reasoning;
+  const sp = model.supported_parameters ?? [];
+  if (!r && !sp.includes("reasoning") && !sp.includes("include_reasoning")) return undefined;
+  if (r && r.supported_efforts !== undefined) return r;
+  return {
+    ...(family === "gemini" ? { default_enabled: true, mandatory: true } : {}),
+    ...r,
+    supported_efforts: FAMILY_EFFORTS[family],
+  };
+}
+
+/** The highest of the given levels. */
+export const highestEffort = (efforts: Effort[]): Effort | undefined => ALL_EFFORTS.find((e) => efforts.includes(e));
+
 const nearest = (effort: Effort, allowed: Effort[]): Effort => {
   if (allowed.includes(effort)) return effort;
   const idx = ALL_EFFORTS.indexOf(effort);
@@ -58,7 +88,7 @@ const nearest = (effort: Effort, allowed: Effort[]): Effort => {
 export function settingsControls(model: ModelInfo, blockedConfigUpdate: string[] = []): SettingsControls {
   const family = familyOf(model.id);
   const sp = new Set(model.supported_parameters ?? []);
-  const r = model.reasoning;
+  const r = reasoningInfo(model);
   const hints: string[] = [];
 
   let efforts: Effort[] = [];
@@ -107,7 +137,7 @@ export interface ResolvedReasoning {
 
 /** Turn the user's reasoning settings into the `reasoning` request object (never both effort and max_tokens). */
 export function resolveReasoning(settings: ModelSettings, model: ModelInfo): ResolvedReasoning {
-  const r = model.reasoning;
+  const r = reasoningInfo(model);
   if (!r) return { kind: { kind: "default" } };
   const ctl = settingsControls(model);
   const s = settings.reasoning;
@@ -156,6 +186,7 @@ export function buildRequestParams(settings: ModelSettings, model: ModelInfo): R
     claude: ctl.family === "claude",
     userMax: settings.max_tokens,
     reasoning: res.kind,
+    modelMax: model.top_provider?.max_completion_tokens,
   });
 
   const p = settings.provider;
@@ -171,10 +202,27 @@ export function buildRequestParams(settings: ModelSettings, model: ModelInfo): R
 }
 
 export function defaultSettings(model?: ModelInfo): ModelSettings {
-  const r = model?.reasoning;
+  const r = model ? reasoningInfo(model) : undefined;
   return {
     reasoning: {
       enabled: r?.default_enabled ? true : undefined,
     },
   };
+}
+
+/** How hard answers think unless a model's own settings say otherwise (Settings › Models › Answers). */
+export type AnswerThinking = "default" | "low" | "medium" | "high" | "highest";
+
+/**
+ * Apply the answers' thinking level to settings that don't choose one: an explicit effort, a token budget or
+ * reasoning switched off always win. The level is matched to what the model offers.
+ */
+export function withAnswerThinking(settings: ModelSettings, model: ModelInfo, thinking: AnswerThinking): ModelSettings {
+  if (thinking === "default") return settings;
+  const r = settings.reasoning;
+  if (r.effort || r.budget !== undefined || r.enabled === false) return settings;
+  const efforts = settingsControls(model).reasoning.efforts;
+  if (!efforts.length) return settings;
+  const effort = thinking === "highest" ? highestEffort(efforts)! : nearest(thinking, efforts);
+  return { ...settings, reasoning: { ...r, effort } };
 }

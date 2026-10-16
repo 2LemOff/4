@@ -1,12 +1,17 @@
-import { buildRequestParams, defaultSettings } from "./modelRules";
+import { buildRequestParams, defaultSettings, withAnswerThinking } from "./modelRules";
 import { roleDefaults } from "./models";
 import { modelInfo, modelsStore, settingsStore, updateSettings } from "./store";
 import { defaultTaskModel, TASK, taskModelSettings, taskPrompt, type TaskId, type TaskSettings } from "./tasks";
 import type { ModelInfo, ModelSettings } from "./types";
 
-/** Saved settings of the answer model (also the starting point for every question). */
+/**
+ * Settings of the answer model (also the starting point for every question): its saved settings, else its
+ * defaults, thinking at the answers' level (Settings › Models › Answers) unless the saved settings choose one.
+ */
 export function settingsFor(modelId: string): ModelSettings {
-  return settingsStore.get().modelSettings[modelId] ?? defaultSettings(modelInfo(modelId));
+  const s = settingsStore.get();
+  const info = modelInfo(modelId);
+  return withAnswerThinking(s.modelSettings[modelId] ?? defaultSettings(info), info, s.answerThinking ?? "high");
 }
 
 const saved = (id: TaskId): TaskSettings | undefined => settingsStore.get().tasks[id];

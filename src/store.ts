@@ -1,4 +1,5 @@
 import type { BranchMode } from "./panes";
+import type { AnswerThinking } from "./modelRules";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { liveQuery } from "dexie";
 import { kvGet, kvSet } from "./db";
@@ -62,6 +63,8 @@ export interface AppSettings {
   claimWebSearch: boolean;
   /** how a branch opens beside the original */
   branchMode: BranchMode;
+  /** how hard answers think unless a model's saved settings say otherwise */
+  answerThinking: AnswerThinking;
   /** a follow-up in a branch continues it ("thread") or starts a new branch from the same words ("branch") */
   followUp: "thread" | "branch";
   /** the keyboard shrinks the screen ("resize") or covers it while only the question box rises ("overlay") */
@@ -98,6 +101,7 @@ export const defaultAppSettings = (): AppSettings => ({
   quickAutoCheck: false,
   claimWebSearch: false,
   branchMode: "split",
+  answerThinking: "high",
   followUp: "thread",
   keyboardMode: "resize",
   synthesis: DEFAULT_SYNTHESIS,

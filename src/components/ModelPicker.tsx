@@ -14,6 +14,7 @@ export function ModelPicker({
   allowEmpty,
   emptyLabel,
   filter,
+  priceHint,
 }: {
   value: string;
   onChange: (id: string) => void;
@@ -23,6 +24,8 @@ export function ModelPicker({
   emptyLabel?: string;
   /** only models that can do the job (e.g. read images) */
   filter?: (m: ModelInfo) => boolean;
+  /** an extra price line per model (e.g. what an attached video costs on it) */
+  priceHint?: (m: ModelInfo) => string;
 }) {
   const store = useStore(modelsStore);
   const { loading, error, firstSeen, fetchedAt } = store;
@@ -95,6 +98,7 @@ export function ModelPicker({
                 {priceLabel(m)}
                 {m.reasoning ? " · reasoning" : ""}
               </span>
+              {priceHint && <span className="small price-hint">{priceHint(m)}</span>}
             </button>
           ))}
           {!list.length && models.length > 0 && <p className="muted">No matches.</p>}

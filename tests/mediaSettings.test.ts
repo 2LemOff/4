@@ -3,6 +3,7 @@ import {
   defaultsFor,
   estimateImagePrice,
   estimateVideoPrice,
+  skuUnit,
   formatPrice,
   imageControls,
   maxReferences,
@@ -81,9 +82,22 @@ describe("video controls", () => {
     expect(estimateVideoPrice(veo.pricing_skus, { duration: 8, resolution: "1080p" })).toMatchObject({ min: 4.8, max: 4.8 });
     expect(estimateVideoPrice(veo.pricing_skus, { duration: 8, resolution: "720p", audio: true })).toMatchObject({ min: 3.2, max: 3.2 });
     expect(estimateVideoPrice(veo.pricing_skus, { duration: 8, resolution: "720p", audio: false })).toMatchObject({ min: 1.6, max: 1.6 });
-    expect(estimateVideoPrice({ generate: 0.9 }, { duration: 5 })).toMatchObject({ min: 0.9, basis: "per clip" });
+    // OpenRouter's own example: Veo 3.1 lists { generate: "0.50" }, a price per second of video
+    expect(estimateVideoPrice({ generate: "0.50" }, { duration: 8 })).toMatchObject({ min: 4, max: 4, basis: "generate (per second) × 8 s" });
+    expect(estimateVideoPrice({ "per-video": 0.9 }, { duration: 5 })).toMatchObject({ min: 0.9, basis: "per clip" });
+    // surcharges for sent references aren't the clip's price
+    expect(estimateVideoPrice({ "per-video-second": "0.10", "per-video-second-video-input": "0.30" }, { duration: 5 })).toMatchObject({ min: 0.5, max: 0.5 });
+    // token-priced (e.g. Seedance): 1280×720×24×5/1024 = 108,000 tokens at $2.50 per million
+    expect(estimateVideoPrice({ "per-million-video-tokens": "2.5" }, { duration: 5, resolution: "720p" })).toMatchObject({ min: 0.27, max: 0.27 });
     expect(estimateVideoPrice(null, {})).toBeUndefined();
     expect(formatPrice(estimateVideoPrice({ "per-video-second": 0.1028 }, { duration: 5 }))).toBe("about $0.51");
+  });
+  it("knows how each SKU is billed", () => {
+    expect(skuUnit("generate")).toBe("second");
+    expect(skuUnit("per-video-second-1080p")).toBe("second");
+    expect(skuUnit("per-video")).toBe("clip");
+    expect(skuUnit("per-request")).toBe("clip");
+    expect(skuUnit("video_tokens")).toBe("token");
   });
   it("poll states", () => {
     expect(videoPhase("pending")).toBe("wait");

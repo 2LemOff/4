@@ -6,7 +6,7 @@ import { setTask } from "../taskConfig";
 import { ModelPicker } from "../components/ModelPicker";
 import { MediaControls } from "../components/MediaControls";
 import { imageSetup, loadEndpoints, loadMediaModels, mediaStore, videoSetup } from "../media";
-import { formatPrice } from "../mediaSettings";
+import { formatPrice, skuUnit } from "../mediaSettings";
 
 /** Shrink a screenshot to at most 768px wide as JPEG, so the vision request stays small. */
 async function toDataUrl(file: File): Promise<string> {
@@ -249,7 +249,11 @@ function MediaSettings() {
         <details className="group">
           <summary className="small">Price details</summary>
           <ul className="small">
-            {Object.entries(vid.info.pricing_skus).map(([k, v]) => <li key={k}>{k}: ${String(v)}</li>)}
+            {Object.entries(vid.info.pricing_skus).map(([k, v]) => (
+              <li key={k}>
+                {k}: ${String(v)} {skuUnit(k) === "second" ? "per second" : skuUnit(k) === "token" ? "(video tokens)" : "per clip"}
+              </li>
+            ))}
           </ul>
         </details>
       )}

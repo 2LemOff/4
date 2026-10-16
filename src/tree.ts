@@ -132,6 +132,8 @@ export interface ChatMessage {
   content: string;
   /** pictures sent with this turn (data URLs); turned into image parts when the request is made */
   images?: string[];
+  /** videos sent with this turn (data URLs or links); turned into video parts */
+  videos?: string[];
   reasoning?: string;
   reasoning_details?: ReasoningDetail[];
   configuration_update?: { reasoning: { effort: string } };
@@ -173,6 +175,9 @@ export interface BuildOptions {
   /** for models that can't see pictures: text added to a turn instead (by card id, and for the new question) */
   imageText?: (cardId: string) => string | undefined;
   newImageText?: string;
+  /** videos of earlier turns (by card id) and of the new question, replayed in their own turn */
+  videos?: (cardId: string) => string[] | undefined;
+  newVideos?: string[];
 }
 
 /**
@@ -196,9 +201,10 @@ export function buildMessages(
       msgs.push({ role: "system", content: "", configuration_update: { reasoning: { effort: c.configUpdate.effort } } });
     }
     const imgs = opts.images?.(c.id);
+    const vids = opts.videos?.(c.id);
     const note = opts.imageText?.(c.id);
     const turn = note ? `${userTurn(c.anchor, c.question, c.seq)}\n\n${note}` : userTurn(c.anchor, c.question, c.seq);
-    msgs.push(imgs?.length ? { role: "user", content: turn, images: imgs } : { role: "user", content: turn });
+    msgs.push({ role: "user", content: turn, ...(imgs?.length ? { images: imgs } : {}), ...(vids?.length ? { videos: vids } : {}) });
     const a: ChatMessage = { role: "assistant", content: c.assistant.content };
     if (c.model === opts.model) {
       if (c.assistant.reasoning_details?.length) a.reasoning_details = c.assistant.reasoning_details;
@@ -210,7 +216,7 @@ export function buildMessages(
     msgs.push({ role: "system", content: "", configuration_update: { reasoning: { effort: opts.newConfigUpdate.effort } } });
   }
   const last = opts.newImageText ? `${userTurn(anchor, question, seq)}\n\n${opts.newImageText}` : userTurn(anchor, question, seq);
-  msgs.push(opts.newImages?.length ? { role: "user", content: last, images: opts.newImages } : { role: "user", content: last });
+  msgs.push({ role: "user", content: last, ...(opts.newImages?.length ? { images: opts.newImages } : {}), ...(opts.newVideos?.length ? { videos: opts.newVideos } : {}) });
   return msgs;
 }
 

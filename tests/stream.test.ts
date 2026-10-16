@@ -61,6 +61,18 @@ describe("prepareMessages", () => {
     const out = prepareMessages("anthropic/claude-opus-5", [{ role: "system", content: "S" }, cfg]) as any[];
     expect(out[1]).toBe(cfg);
   });
+  it("sends videos as video parts after the pictures", () => {
+    const out = prepareMessages("google/gemini-3.5-pro", [{ role: "user", content: "Look", images: ["data:image/webp;base64,AA"], videos: ["data:video/mp4;base64,BB", "https://youtu.be/x"] }]) as any[];
+    expect(out[0]).toEqual({
+      role: "user",
+      content: [
+        { type: "text", text: "Look" },
+        { type: "image_url", image_url: { url: "data:image/webp;base64,AA" } },
+        { type: "video_url", video_url: { url: "data:video/mp4;base64,BB" } },
+        { type: "video_url", video_url: { url: "https://youtu.be/x" } },
+      ],
+    });
+  });
   it("sends pictures as image parts of their own turn", () => {
     const msgs = [
       { role: "system" as const, content: "SYS" },

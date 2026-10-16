@@ -5,6 +5,7 @@ import { modelInfo, modelsStore, settingsStore } from "./store";
 import { taskSetup } from "./taskConfig";
 import type { BuildOptions } from "./tree";
 import type { Card, CardImage, ModelInfo } from "./types";
+import { seesVideo } from "./videoCost";
 
 /** Can this model look at pictures? */
 export const seesImages = (m: ModelInfo) => !!m.architecture?.input_modalities?.includes("image");
@@ -127,28 +128,127 @@ export async function withImageText(cards: Card[]): Promise<Card[]> {
   return reload(now);
 }
 
-export type ImageOptions = Pick<BuildOptions, "images" | "newImages" | "imageText" | "newImageText">;
+export type ImageOptions = Pick<BuildOptions, "images" | "newImages" | "imageText" | "newImageText" | "videos" | "newVideos">;
+
+async function mediaUrls(ids: string[]): Promise<string[]> {
+  const out: string[] = [];
+  for (const id of ids) {
+    const rec = await db.media.get(id);
+    if (rec) out.push(await blobToDataUrl(rec.blob));
+  }
+  return out;
+}
 
 /**
- * How the pictures attached along a branch are replayed for one model: the pictures themselves, each in the
- * turn it was sent with, for a model that can see them; else the text read from them (read first if needed).
+ * How the pictures and videos attached along a branch are replayed for one model, each in the turn it was sent
+ * with: pictures for a model that sees them, else the text read from them (read first if needed); videos for a
+ * model that watches them, else their still frames for a model that sees pictures, else a note.
  */
 export async function imageOptions(model: string, path: Card[], card?: Card): Promise<ImageOptions> {
   const all = card ? [...path, card] : path;
-  if (!all.some((c) => c.images?.length)) return {};
-  if (seesImages(modelInfo(model))) {
-    const urls = await imageUrls(all);
-    const byId = new Map(all.map((c) => [c.id, c]));
-    const caption = (id: string) => {
-      const c = byId.get(id);
-      return c && imageCaption(c);
-    };
-    return { images: (id) => urls.get(id), newImages: card && urls.get(card.id), imageText: caption, newImageText: card && caption(card.id) };
+  if (!all.some((c) => c.images?.length || c.videos?.length)) return {};
+  const info = modelInfo(model);
+  const sees = seesImages(info);
+  const watches = seesVideo(info);
+  const cards = !sees && all.some((c) => c.images?.length) ? await withImageText(all) : all;
+  const urls = sees ? await imageUrls(cards) : new Map<string, string[]>();
+  const notes = new Map<string, string>();
+  const vids = new Map<string, string[]>();
+  for (const c of cards) {
+    const lines: string[] = [];
+    const t = c.images?.length ? (sees ? imageCaption(c) : imageNote(c)) : undefined;
+    if (t) lines.push(t);
+    for (const [i, v] of (c.videos ?? []).entries()) {
+      const len = v.seconds ? ` (${Math.round(v.seconds)} s)` : "";
+      if (watches && (v.link || v.mediaId)) {
+        const url = v.link ?? (await mediaUrls([v.mediaId!]))[0];
+        if (url) vids.set(c.id, [...(vids.get(c.id) ?? []), url]);
+        else lines.push(`[Attached video ${i + 1}${len}: the file was deleted.]`);
+      } else if (sees && v.frames?.length) {
+        const frames = await mediaUrls(v.frames);
+        urls.set(c.id, [...(urls.get(c.id) ?? []), ...frames]);
+        lines.push(`[Video ${i + 1}${len} is shown as ${frames.length} still frame${frames.length > 1 ? "s" : ""}, in order, after any pictures.]`);
+      } else {
+        lines.push(`[Attached video ${i + 1}${len}${v.link ? `: ${v.link}` : ""}. This model can't watch videos.]`);
+      }
+    }
+    if (lines.length) notes.set(c.id, lines.join("\n"));
   }
-  const byId = new Map((await withImageText(all)).map((c) => [c.id, c]));
-  const note = (id: string) => {
-    const c = byId.get(id);
-    return c && imageNote(c);
+  const id = card?.id;
+  return {
+    images: (x) => urls.get(x),
+    newImages: id ? urls.get(id) : undefined,
+    imageText: (x) => notes.get(x),
+    newImageText: id ? notes.get(id) : undefined,
+    videos: (x) => vids.get(x),
+    newVideos: id ? vids.get(id) : undefined,
   };
-  return { imageText: note, newImageText: card && note(card.id) };
+}
+
+/** A model that can watch videos: the chosen one if it can, else the newest of its family that can, else Gemini. */
+export function videoModelFor(current: string): string | undefined {
+  if (seesVideo(modelInfo(current))) return current;
+  const models = modelsStore.get().models.filter(seesVideo);
+  const fam = PICKER_FAMILIES.find((f) => familyModels(modelsStore.get().models, f.id, 50).some((m) => m.id === current));
+  const same = fam ? familyModels(models, fam.id, 1)[0] : undefined;
+  if (same) return same.id;
+  for (const f of ["gemini-pro", "gemini-flash"] as const) {
+    const m = familyModels(models, f, 1)[0];
+    if (m) return m.id;
+  }
+  return models.filter((m) => !m.id.includes(":")).sort((a, b) => (b.created ?? 0) - (a.created ?? 0))[0]?.id;
+}
+
+const once = (el: HTMLMediaElement, ev: string, ms = 4000) =>
+  new Promise<void>((resolve) => {
+    const t = window.setTimeout(resolve, ms);
+    el.addEventListener(ev, () => (window.clearTimeout(t), resolve()), { once: true });
+  });
+
+/**
+ * A video's length and a few still frames (one every 2 seconds, at most `maxFrames`, 768 px), read on the phone
+ * so its price can be shown and models that only see pictures can still follow it.
+ */
+export async function probeVideo(file: Blob, maxFrames = 8): Promise<{ seconds?: number; frames: Blob[] }> {
+  const url = URL.createObjectURL(file);
+  const v = document.createElement("video");
+  v.muted = true;
+  v.playsInline = true;
+  v.preload = "auto";
+  try {
+    // a video this phone can't play (or that doesn't load) is still sent whole, without frames
+    const loaded = await new Promise<boolean>((resolve) => {
+      const t = window.setTimeout(() => resolve(false), 10_000);
+      v.onloadeddata = () => (window.clearTimeout(t), resolve(true));
+      v.onerror = () => (window.clearTimeout(t), resolve(false));
+      v.src = url;
+    });
+    if (!loaded) return { seconds: isFinite(v.duration) && v.duration > 0 ? v.duration : undefined, frames: [] };
+    let seconds = v.duration;
+    // recordings sometimes report no length until the end has been read
+    if (!isFinite(seconds)) {
+      v.currentTime = 1e7;
+      await once(v, "seeked");
+      seconds = v.duration;
+    }
+    if (!isFinite(seconds) || seconds <= 0) return { frames: [] };
+    const n = Math.max(1, Math.min(maxFrames, Math.ceil(seconds / 2)));
+    const frames: Blob[] = [];
+    const k = Math.min(1, 768 / Math.max(v.videoWidth || 768, v.videoHeight || 768));
+    const c = document.createElement("canvas");
+    c.width = Math.max(1, Math.round((v.videoWidth || 320) * k));
+    c.height = Math.max(1, Math.round((v.videoHeight || 180) * k));
+    for (let i = 0; i < n; i++) {
+      v.currentTime = Math.min(Math.max(0, seconds - 0.05), ((i + 0.5) * seconds) / n);
+      await once(v, "seeked");
+      c.getContext("2d")!.drawImage(v, 0, 0, c.width, c.height);
+      const b = await new Promise<Blob | null>((r) => c.toBlob(r, "image/webp", 0.8));
+      if (b) frames.push(b);
+    }
+    return { seconds, frames };
+  } finally {
+    v.removeAttribute("src");
+    v.load();
+    URL.revokeObjectURL(url);
+  }
 }

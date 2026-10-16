@@ -7,15 +7,16 @@ const CORS = {
 };
 
 const SEES = { input_modalities: ["text", "image"], output_modalities: ["text"] };
+const WATCHES = { input_modalities: ["text", "image", "video", "audio"], output_modalities: ["text"] };
 export const MODELS = [
   {
-    id: "google/gemini-3.5-pro", architecture: SEES, name: "Gemini 3.5 Pro", created: 400, context_length: 1_000_000,
+    id: "google/gemini-3.5-pro", architecture: WATCHES, name: "Gemini 3.5 Pro", created: 400, context_length: 1_000_000,
     pricing: { prompt: "0.000002", completion: "0.000012" },
     supported_parameters: ["max_tokens", "temperature", "top_p", "seed", "reasoning", "structured_outputs"],
     reasoning: { supported_efforts: ["high", "medium", "low", "minimal"], default_effort: "medium", default_enabled: true, mandatory: true, supports_max_tokens: true },
   },
   {
-    id: "google/gemini-3.6-flash", architecture: SEES, name: "Gemini 3.6 Flash", created: 410, context_length: 1_000_000,
+    id: "google/gemini-3.6-flash", architecture: WATCHES, name: "Gemini 3.6 Flash", created: 410, context_length: 1_000_000,
     pricing: { prompt: "0.0000003", completion: "0.0000025" },
     supported_parameters: ["max_tokens", "temperature", "reasoning", "structured_outputs"],
     reasoning: { supported_efforts: ["high", "medium", "low", "minimal"], default_effort: "low", default_enabled: true, mandatory: true, supports_max_tokens: true },
@@ -109,6 +110,8 @@ export interface MockOptions {
   answer?: (question: string, body: any) => string;
   /** override finish_reason / usage on streamed answers */
   stream?: (body: any) => { finish?: string; usage?: any; reasoning?: boolean };
+  /** change the text model list (e.g. add a new model) */
+  models?: (list: any[]) => any[];
 }
 
 export interface Calls {
@@ -160,7 +163,7 @@ export async function mockOpenRouter(page: Page, opts: MockOptions = {}): Promis
 
     if (url.pathname.endsWith("/v1/models")) {
       const out = url.searchParams.get("output_modalities");
-      return json({ data: out === "embeddings" ? EMBED_MODELS : out === "speech" ? SPEECH_MODELS : out ? [] : MODELS });
+      return json({ data: out === "embeddings" ? EMBED_MODELS : out === "speech" ? SPEECH_MODELS : out ? [] : opts.models ? opts.models(MODELS) : MODELS });
     }
     if (url.pathname.endsWith("/embeddings")) {
       const body = req.postDataJSON();

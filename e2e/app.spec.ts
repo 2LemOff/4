@@ -221,6 +221,33 @@ test.describe("model settings", () => {
     await expect(picker.getByText(/List updated/)).toBeVisible();
   });
 
+  test("a new model listed without its reasoning levels (Gemini 4 Argon) thinks high, with room to answer", async ({ page }) => {
+    const calls = await mockOpenRouter(page, {
+      models: (list) => [
+        ...list,
+        // like a brand-new listing: reasoning in supported_parameters, but no reasoning object or effort list yet
+        { id: "google/gemini-4-argon", name: "Gemini 4 Argon", created: 390, context_length: 1_048_576, architecture: { input_modalities: ["text", "image", "video"], output_modalities: ["text"] }, pricing: { prompt: "0.000002", completion: "0.00001" }, supported_parameters: ["max_tokens", "reasoning", "include_reasoning", "structured_outputs"], top_provider: { context_length: 1_048_576, max_completion_tokens: 65536 } },
+      ],
+    });
+    await connect(page);
+    await page.getByRole("button", { name: "Model settings" }).click();
+    const sheet = page.getByRole("dialog", { name: "Model settings" });
+    await sheet.getByRole("button", { name: /Model for this question/ }).click();
+    await page.getByLabel("Search models").fill("argon");
+    await page.getByRole("button", { name: /gemini-4-argon/ }).first().click();
+    // every level is offered, and answers think high by default (Settings › Models › Answers)
+    for (const e of ["high", "medium", "low", "minimal"]) await expect(sheet.getByRole("radio", { name: e, exact: true })).toBeVisible();
+    await expect(sheet.getByRole("radio", { name: "high", exact: true })).toHaveAttribute("aria-checked", "true");
+    await sheet.getByRole("button", { name: "Done" }).click();
+    await page.getByLabel("What do you want to understand?").fill("Why is the sky blue?");
+    await page.getByRole("button", { name: "Ask", exact: true }).click();
+    await expect.poll(() => calls.stream.length).toBe(1);
+    expect(calls.stream[0].model).toBe("google/gemini-4-argon");
+    expect(calls.stream[0].reasoning).toEqual({ effort: "high" });
+    expect(calls.stream[0].max_tokens).toBe(32768);
+    await expect(page.locator(".answer-foot")).toContainText("gemini-4-argon · high thinking");
+  });
+
   test("each model shows only the controls it supports", async ({ page }) => {
     await mockOpenRouter(page);
     await connect(page);

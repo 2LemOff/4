@@ -46,6 +46,8 @@ export interface AskOptions {
   fromVisual?: string;
   /** photos or screenshots (already shrunk) sent with the question */
   images?: { blob: Blob; label: string; partOf?: number }[];
+  /** videos (a file or a link) with their length and still frames */
+  videos?: { blob?: Blob; link?: string; label: string; seconds?: number; frames: Blob[] }[];
 }
 
 /** Create the card (and the session, for a first question) and start streaming. Returns immediately. */
@@ -93,6 +95,24 @@ export async function ask(o: AskOptions): Promise<{ cardId: string; sessionId: s
       const mediaId = uid();
       await db.media.put({ id: mediaId, sessionId, kind: "image", mime: im.blob.type || "image/webp", size: im.blob.size, label: `${o.question.slice(0, 40)} · photo ${i + 1}`, blob: im.blob, createdAt: now });
       card.images.push({ mediaId, label: im.label, partOf: im.partOf });
+    }
+  }
+  if (o.videos?.length) {
+    card.videos = [];
+    for (const [i, v] of o.videos.entries()) {
+      const name = `${o.question.slice(0, 40)} · video ${i + 1}`;
+      let mediaId: string | undefined;
+      if (v.blob) {
+        mediaId = uid();
+        await db.media.put({ id: mediaId, sessionId, kind: "video", mime: v.blob.type || "video/mp4", size: v.blob.size, label: name, blob: v.blob, createdAt: now });
+      }
+      const frames: string[] = [];
+      for (const [j, f] of v.frames.entries()) {
+        const id = uid();
+        await db.media.put({ id, sessionId, kind: "image", mime: f.type || "image/webp", size: f.size, label: `${name} · frame ${j + 1}`, blob: f, createdAt: now });
+        frames.push(id);
+      }
+      card.videos.push({ ...(mediaId ? { mediaId } : {}), ...(v.link ? { link: v.link } : {}), label: v.label, ...(v.seconds ? { seconds: v.seconds } : {}), frames });
     }
   }
   await db.cards.put(card);
@@ -345,7 +365,9 @@ export async function retry(cardId: string, how: "same" | "more" | "lower" = "sa
   const model = modelInfo(card.model);
   const settings: ModelSettings = JSON.parse(JSON.stringify(card.modelSettings ?? settingsFor(card.model)));
   if (how === "more") {
-    settings.max_tokens = Math.min((settings.max_tokens ?? DEFAULT_MAX_TOKENS) * 2, 128000);
+    // double what was actually sent (high thinking already gets more than the plain default)
+    const sent = Number(buildRequestParams(settings, model).max_tokens) || DEFAULT_MAX_TOKENS;
+    settings.max_tokens = Math.min(sent * 2, model.top_provider?.max_completion_tokens || 128000);
   } else if (how === "lower") {
     const ctl = settingsControls(model);
     if (settings.reasoning.budget !== undefined) {
@@ -372,7 +394,9 @@ export async function deleteBranch(cardId: string): Promise<{ sessionId: string;
   }
   const ids = [...doomed];
   // the pictures sent with these questions go with them
-  const pictures = all.filter((c) => doomed.has(c.id)).flatMap((c) => c.images?.map((im) => im.mediaId) ?? []);
+  const pictures = all
+    .filter((c) => doomed.has(c.id))
+    .flatMap((c) => [...(c.images?.map((im) => im.mediaId) ?? []), ...(c.videos ?? []).flatMap((v) => [...(v.mediaId ? [v.mediaId] : []), ...(v.frames ?? [])])]);
   if (pictures.length) await db.media.bulkDelete(pictures);
   await db.cards.bulkDelete(ids);
   await db.vectors.where("cardId").anyOf(ids).delete();

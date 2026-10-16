@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { ask, settingsFor } from "../ai";
 import { councilChairman, councilMembers as councilMembersList } from "../council";
-import { cropImage, seesImages, shrinkImage, visionModelFor } from "../photos";
+import { cropImage, probeVideo, seesImages, shrinkImage, videoModelFor, visionModelFor } from "../photos";
+import { costLabel, MAX_VIDEO_BYTES, seesVideo, videoCost, videosCostLabel } from "../videoCost";
 import { taskSetup } from "../taskConfig";
 import { go, hrefCard } from "../route";
 import { modelInfo, settingsStore, updateSettings, useStore } from "../store";
-import { AttachedRow, AttachSheet, attachedLabels, ImageRegion, type Attached, type Box } from "./Attachments";
+import { AttachedRow, AttachedVideos, AttachSheet, attachedLabels, ImageRegion, type Attached, type AttachedVideo, type Box } from "./Attachments";
 import { Icon } from "./Icon";
 import { ModelPicker, shortName } from "./ModelPicker";
 import { ModelSettingsEditor } from "./ModelSettingsEditor";
@@ -21,6 +22,7 @@ type Recognizer = { lang: string; interimResults: boolean; onresult: ((e: { resu
 const SpeechRec: (new () => Recognizer) | undefined =
   typeof window !== "undefined" ? ((window as unknown as Record<string, unknown>).SpeechRecognition ?? (window as unknown as Record<string, unknown>).webkitSpeechRecognition) as (new () => Recognizer) | undefined : undefined;
 const isPicture = (f: Blob) => !f.type || f.type.startsWith("image/");
+const isVideo = (f: Blob) => f.type.startsWith("video/");
 
 const readChips = () => {
   try {
@@ -99,12 +101,15 @@ export function Composer({
   const [chips, setChips] = useState(readChips);
   const [err, setErr] = useState("");
   const [attached, setAttached] = useState<Attached[]>([]);
+  const [videos, setVideos] = useState<AttachedVideo[]>([]);
   const [attachOpen, setAttachOpen] = useState(false);
   const [region, setRegion] = useState<string>();
   // pictures still being made smaller or cut (the question waits for them)
   const [preparing, setPreparing] = useState(0);
   // the model chosen before pictures needed one that can see them (back when they're all removed)
   const [switchedFrom, setSwitchedFrom] = useState<string>();
+  // a model picked by hand while pictures or videos are attached stays the choice (e.g. still frames on purpose)
+  const [picked, setPicked] = useState(false);
   const own = useRef<HTMLTextAreaElement>(null);
   const [listening, setListening] = useState(false);
   const rec = useRef<Recognizer | null>(null);
@@ -150,12 +155,45 @@ export function Composer({
   // thumbnails are object URLs: let them go when the question box closes
   const live = useRef(attached);
   live.current = attached;
-  useEffect(() => () => live.current.forEach((a) => URL.revokeObjectURL(a.url)), []);
+  const liveVideos = useRef(videos);
+  liveVideos.current = videos;
+  useEffect(
+    () => () => {
+      live.current.forEach((a) => URL.revokeObjectURL(a.url));
+      liveVideos.current.forEach((v) => v.poster && URL.revokeObjectURL(v.poster));
+    },
+    [],
+  );
 
   const make = (blob: Blob, extra: Partial<Attached> = {}): Attached => ({ key: `p${++attachSeq}`, blob, url: URL.createObjectURL(blob), ...extra });
+  // a video is read on the phone first: its length (for the price) and a few still frames
+  const addVideos = async (files: Blob[]) => {
+    for (const f of files) {
+      if (f.size > MAX_VIDEO_BYTES) {
+        setErr(`This video is ${Math.round(f.size / 1024 / 1024)} MB; videos up to ${MAX_VIDEO_BYTES / 1024 / 1024} MB can be sent. Trim it in your gallery, or add a YouTube link instead.`);
+        continue;
+      }
+      setPreparing((n) => n + 1);
+      try {
+        // a video this phone can't play is still sent whole, just without its length and frames
+        const p = await probeVideo(f).catch(() => ({ seconds: undefined, frames: [] as Blob[] }));
+        const v: AttachedVideo = { key: `v${++attachSeq}`, file: f, seconds: p.seconds, frames: p.frames, poster: p.frames[0] ? URL.createObjectURL(p.frames[0]) : undefined };
+        setVideos((list) => [...list, v]);
+      } finally {
+        setPreparing((n) => n - 1);
+      }
+    }
+  };
+  const removeVideo = (key: string) => {
+    const v = videos.find((x) => x.key === key);
+    if (v?.poster) URL.revokeObjectURL(v.poster);
+    setVideos((list) => list.filter((x) => x.key !== key));
+  };
   const addFiles = async (files: Blob[]) => {
-    const pics = files.filter(isPicture);
-    setErr(pics.length < files.length ? "Only pictures can be added." : "");
+    const vids = files.filter(isVideo);
+    const pics = files.filter((f) => !isVideo(f) && isPicture(f));
+    setErr(pics.length + vids.length < files.length ? "Only pictures and videos can be added." : "");
+    if (vids.length) void addVideos(vids);
     setPreparing((n) => n + pics.length);
     for (const f of pics) {
       try {
@@ -203,10 +241,13 @@ export function Composer({
     void addPart(whole.key, addPicture.box);
   }, [addPicture?.n]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // pictures need a model that can see them (council members that can't get the text read from them)
+  // pictures need a model that can see them, videos one that can watch them (council members that can't get
+  // the text read from pictures, and still frames of videos)
   const hasPictures = attached.length > 0;
+  const needs = videos.length ? "video" : hasPictures ? "image" : undefined;
   useEffect(() => {
-    if (!hasPictures) {
+    if (!needs) {
+      setPicked(false);
       if (switchedFrom) {
         setModel(switchedFrom);
         setSettings(settingsFor(switchedFrom));
@@ -214,22 +255,29 @@ export function Composer({
       }
       return;
     }
-    if (council || !model || seesImages(modelInfo(model))) return;
-    const v = visionModelFor(model);
-    if (!v) return;
-    setSwitchedFrom(model);
+    const info = modelInfo(model);
+    if (council || !model || picked || (needs === "video" ? seesVideo(info) : seesImages(info))) return;
+    const v = needs === "video" ? videoModelFor(model) ?? (seesImages(info) ? undefined : visionModelFor(model)) : visionModelFor(model);
+    if (!v || v === model) return;
+    setSwitchedFrom((was) => was ?? model);
     setModel(v);
     setSettings(settingsFor(v));
-  }, [hasPictures, council, model]); // eslint-disable-line react-hooks/exhaustive-deps
-  const pictureNote = !hasPictures
+  }, [needs, council, model, picked]); // eslint-disable-line react-hooks/exhaustive-deps
+  const info = modelInfo(model);
+  const pictureNote = !needs
     ? ""
     : council
-      ? "Council members that can't see pictures get the text read from them."
-      : !seesImages(modelInfo(model))
-        ? "None of the models can see pictures: the text read from them is sent instead."
-        : switchedFrom
-          ? `Using ${shortName(model)}, which can see pictures.`
-          : "";
+      ? `Council members that can't ${videos.length ? "watch videos get still frames" : "see pictures get the text read from them"}.`
+      : needs === "video" && !seesVideo(info)
+        ? seesImages(info)
+          ? "This model can't watch videos: still frames from them are sent instead."
+          : "None of the models can see videos: only a note about them is sent."
+        : !seesImages(info) && !seesVideo(info)
+          ? "None of the models can see pictures: the text read from them is sent instead."
+          : switchedFrom
+            ? `Using ${shortName(model)}, which can ${needs === "video" ? "watch videos" : "see pictures"}.`
+            : "";
+  const videoPrice = (v: AttachedVideo) => `${costLabel(videoCost(info, v.seconds, v.frames.length, seesImages(info)), v.seconds)} with ${shortName(model)}`;
 
   const grow = () => {
     const el = ta.current;
@@ -252,7 +300,19 @@ export function Composer({
   };
 
   const submit = async (q: string) => {
-    const question = q.trim() || (attached.length ? (attached.length > 1 ? "Explain these pictures." : "Explain this picture.") : "");
+    const question =
+      q.trim() ||
+      (videos.length && attached.length
+        ? "Explain these."
+        : videos.length
+          ? videos.length > 1
+            ? "Explain these videos."
+            : "Explain this video."
+          : attached.length
+            ? attached.length > 1
+              ? "Explain these pictures."
+              : "Explain this picture."
+            : "");
     if (!question || preparing) return;
     if (!apiKey) return setErr("Connect OpenRouter in Settings first.");
     if (!model) return setErr("Choose a model first.");
@@ -262,9 +322,12 @@ export function Composer({
     const labels = attachedLabels(attached);
     const keys = attached.map((a) => a.key);
     const images = attached.map((a) => ({ blob: a.blob, label: labels.get(a.key) ?? "Picture", partOf: a.partOf ? keys.indexOf(a.partOf) : undefined }));
-    const r = await ask({ sessionId, parentId, question, anchor, model: chair, settings: council ? taskSetup("chairman").settings : settings, council, fromVisual, images: images.length ? images : undefined });
+    const vids = videos.map((v, i) => ({ blob: v.file, link: v.link, label: `Video ${i + 1}`, seconds: v.seconds, frames: v.frames }));
+    const r = await ask({ sessionId, parentId, question, anchor, model: chair, settings: council ? taskSetup("chairman").settings : settings, council, fromVisual, images: images.length ? images : undefined, videos: vids.length ? vids : undefined });
     setText("");
     attached.forEach((a) => URL.revokeObjectURL(a.url));
+    videos.forEach((v) => v.poster && URL.revokeObjectURL(v.poster));
+    setVideos([]);
     // the question went to the model that sees them: that stays the choice
     setSwitchedFrom(undefined);
     setAttached([]);
@@ -286,6 +349,7 @@ export function Composer({
         </div>
       )}
       {(attached.length > 0 || preparing > 0) && <AttachedRow list={attached} preparing={preparing} onRemove={remove} onPart={setRegion} />}
+      {videos.length > 0 && <AttachedVideos list={videos} cost={videoPrice} onRemove={removeVideo} />}
       {pictureNote && <p className="muted small" role="status">{pictureNote}</p>}
       {above}
       {chips && !big && (
@@ -305,7 +369,7 @@ export function Composer({
         }}
       >
         {attach && (
-          <button type="button" className="btn icon sm" aria-label="Add a picture" onClick={() => setAttachOpen(true)}>
+          <button type="button" className="btn icon sm" aria-label="Add a picture or video" onClick={() => setAttachOpen(true)}>
             <Icon name="attach" />
           </button>
         )}
@@ -316,7 +380,7 @@ export function Composer({
           value={text}
           onChange={(e) => setText(e.target.value)}
           onPaste={(e) => {
-            const files = attach ? [...e.clipboardData.files].filter(isPicture) : [];
+            const files = attach ? [...e.clipboardData.files].filter((f) => isPicture(f) || isVideo(f)) : [];
             if (!files.length) return;
             e.preventDefault();
             void addFiles(files);
@@ -376,17 +440,17 @@ export function Composer({
         </button>
         {!big &&
           (sendIcon ? (
-            <button type="submit" className="btn primary icon sm round" aria-label="Ask" disabled={(!text.trim() && !attached.length) || preparing > 0}>
+            <button type="submit" className="btn primary icon sm round" aria-label="Ask" disabled={(!text.trim() && !attached.length && !videos.length) || preparing > 0}>
               <Icon name="up" />
             </button>
           ) : (
-            <button type="submit" className="btn primary sm" disabled={(!text.trim() && !attached.length) || preparing > 0}>
+            <button type="submit" className="btn primary sm" disabled={(!text.trim() && !attached.length && !videos.length) || preparing > 0}>
               Ask
             </button>
           ))}
       </form>
       {big && (
-        <button type="button" className="btn primary wide" disabled={(!text.trim() && !attached.length) || preparing > 0} onClick={() => submit(text)}>
+        <button type="button" className="btn primary wide" disabled={(!text.trim() && !attached.length && !videos.length) || preparing > 0} onClick={() => submit(text)}>
           Ask
         </button>
       )}
@@ -396,7 +460,13 @@ export function Composer({
           {err} {!apiKey && <a href="#/settings/account">Open Settings</a>}
         </p>
       )}
-      {attachOpen && <AttachSheet onFiles={(f) => void addFiles(f)} onClose={() => setAttachOpen(false)} />}
+      {attachOpen && (
+        <AttachSheet
+          onFiles={(f) => void addFiles(f)}
+          onLink={(url) => setVideos((list) => [...list, { key: `v${++attachSeq}`, link: url, frames: [] }])}
+          onClose={() => setAttachOpen(false)}
+        />
+      )}
       {region && (
         <ImageRegion
           src={attached.find((a) => a.key === region)?.url ?? ""}
@@ -411,8 +481,21 @@ export function Composer({
       {open && (
         <Sheet title="Model settings" onClose={() => setOpen(false)}>
           <p className="muted small">These settings apply to this question.</p>
-          {attached.length > 0 && <p className="muted small">Only models that can see pictures are listed.</p>}
-          <ModelPicker value={model} onChange={(id) => (setModel(id), setSettings(settingsFor(id)))} label="Model for this question" filter={attached.length ? seesImages : undefined} />
+          {(attached.length > 0 || videos.length > 0) && <p className="muted small">Only models that can see {videos.length ? "videos or pictures (as still frames)" : "pictures"} are listed{videos.length ? ", with what your video costs on each" : ""}.</p>}
+          <ModelPicker
+            value={model}
+            onChange={(id) => {
+              setModel(id);
+              setSettings(settingsFor(id));
+              if (needs) {
+                setPicked(true);
+                setSwitchedFrom(undefined);
+              }
+            }}
+            label="Model for this question"
+            filter={videos.length ? (m) => seesVideo(m) || seesImages(m) : attached.length ? seesImages : undefined}
+            priceHint={videos.length ? (m) => `your video${videos.length > 1 ? "s" : ""}: ${videosCostLabel(m, videos.map((v) => ({ seconds: v.seconds, frames: v.frames.length })), seesImages(m))}` : undefined}
+          />
           {model && <ModelSettingsEditor modelId={model} value={settings} onChange={setSettings} />}
           <button
             className="btn"

@@ -30,8 +30,13 @@ describe("requestMaxTokens", () => {
   it("respects a larger user max", () => {
     expect(requestMaxTokens({ claude: false, userMax: 50000, reasoning: { kind: "default" } })).toBe(50000);
   });
-  it("does not inflate non-Claude effort requests", () => {
-    expect(requestMaxTokens({ claude: false, reasoning: { kind: "effort", effort: "xhigh" } })).toBe(16000);
+  it("gives high effort room to think, within the model's own output limit", () => {
+    expect(requestMaxTokens({ claude: false, reasoning: { kind: "effort", effort: "low" } })).toBe(16000);
+    expect(requestMaxTokens({ claude: false, reasoning: { kind: "effort", effort: "high" } })).toBe(32768);
+    expect(requestMaxTokens({ claude: false, reasoning: { kind: "effort", effort: "xhigh" } })).toBe(65536);
+    expect(requestMaxTokens({ claude: false, reasoning: { kind: "effort", effort: "high" }, modelMax: 20000 })).toBe(20000);
+    // the user's own max_tokens always wins
+    expect(requestMaxTokens({ claude: false, userMax: 8000, reasoning: { kind: "effort", effort: "high" }, modelMax: 20000 })).toBe(8000);
   });
 });
 

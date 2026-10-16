@@ -167,7 +167,7 @@ export async function runCouncil(cardId: string): Promise<void> {
     : "";
   const ranking = council.aggregate.length ? `\n\nAVERAGE RANKING: ${council.aggregate.map((a) => `${a.label} (${a.avgRank})`).join(", ")}` : "";
   const rules = textMode ? taskSetup("chairman").prompt : `${taskSetup("chairman").prompt.replace(TASK.chairman.fixed ?? "", "").trim()}\n\n${CHAIRMAN_PYRAMID_FORMAT}`;
-  history.push({ role: "user", content: `${rules}\n\nCOUNCIL RESPONSES:\n${responses}${reviews}${ranking}\n\nTHE LEARNER'S MESSAGE:\n${lastTurn.content}`, ...(lastTurn.images ? { images: lastTurn.images } : {}) });
+  history.push({ role: "user", content: `${rules}\n\nCOUNCIL RESPONSES:\n${responses}${reviews}${ranking}\n\nTHE LEARNER'S MESSAGE:\n${lastTurn.content}`, ...(lastTurn.images ? { images: lastTurn.images } : {}), ...(lastTurn.videos ? { videos: lastTurn.videos } : {}) });
   const chairSettings = withReasoning(card.modelSettings ?? settingsFor(chairman), chairman);
   const body: Record<string, unknown> = {
     model: chairman,

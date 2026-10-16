@@ -58,15 +58,17 @@ Three ways to show it, one tap apart in the branch's bar (the default is in Sett
   - Quick answers are never sent with later questions. **Make it a branch** turns the side thread into real questions and answers in the tree.
 - **Check** (on a selection or the tray) splits the words into claims. Each claim is ✓ supported, ? uncertain or ✗ disputed, with a reason. A highlight with a disputed claim gets a red wavy underline. Web search (OpenRouter's web plugin) can be switched on in the **Claim check** task.
 
-## Photos and screenshots
+## Photos, screenshots and videos
 
-- **+** next to the question box (on Home and in the chat) offers **Take a photo**, **Photos and screenshots**, **From files** and **Paste a copied picture**. Pasting a picture straight into the question box works too.
+- **+** next to the question box (on Home and in the chat) offers **Take a photo**, **Photos and screenshots**, **Record a video**, **Videos**, **From files**, **Paste a copied picture** and a field for a **YouTube link**. Pasting a picture or a video straight into the question box works too.
 - Pictures are made smaller (at most 1600 px, WebP) and kept on the phone with the topic. Their thumbnails wait above the question box; ✕ removes one. With no question typed, they're sent with "Explain this picture."
 - **Ask about a part:** the box button on a thumbnail, or **Ask about a part of it** on a picture you already sent, lets you draw a box over what you mean. The part is cut from the picture as it was taken (so it stays sharp) and sent along with the whole picture, and the model is told which picture it is a close-up of.
 - If the chosen model can't see pictures, one that can is used instead (the newest of the same family, else Gemini Pro, Claude Opus or ChatGPT) and named under the box. While pictures are attached, ⚙ lists only models that can see them.
 - **Read the text** under a sent picture: the **Text from images** task (Settings › Models › Photos) copies the picture's text below your message. That text can be highlighted like an answer (Mark+, Ask, Quick, Check, Visualize, the tray), and the question then says the words come from your picture.
 - **History stays append-only:** a picture is replayed in the turn it was sent with. A model that can't see pictures (a council member, say) gets the text read from them instead; the app reads it first when needed.
-- Deleting an answer and its branches deletes the pictures sent with those questions. Backups include them.
+- **Videos** (up to 20 MB each, kept on the phone with the topic; or a link) wait above the question box with their length and **what they cost with the chosen model**, e.g. "Video 1 · 0:12 · ≈ 1.3k tokens · ≈ $0.0025 with gemini-3.5-pro". The phone reads the length and a few still frames (one every 2 seconds, at most 8). Estimates: Gemini 3 and newer count about 70 tokens a frame at one frame a second plus 32 tokens a second of sound, older Gemini about 263 + 32, other models about 300 a second; a link's length isn't known, so its cost shows after the answer. While a video is attached, ⚙ lists the models that can watch videos or see pictures, each with what your video costs on it. With no question typed, it's sent with "Explain this video."
+- A model that **watches videos** gets the whole clip (or the link) in the turn it was sent with. One that only **sees pictures** gets the still frames, in order, and is told so; one that sees neither gets a note. If the chosen model can't watch videos, one that can is used (the newest of the same family, else Gemini Pro or Flash) and named under the box, unless you pick a model by hand. Tap a video under your question to play it.
+- Deleting an answer and its branches deletes the pictures and videos (with their frames) sent with those questions. Backups include them.
 
 ## Visualize
 
@@ -164,7 +166,7 @@ Pyramid topics keep the pyramid chairman: each point cites its sources, and unsu
 - **Pictures:**
   - **Shapes drawn by AI** (default): a small SVG in a chosen look (colorful flat vectors, line art, diagrams on dark, isometric, paper cut-out, chalkboard, or your own). It is sanitized and shown only as an image.
   - **AI image** per slide or for every slide. Models and settings come from OpenRouter's `/images/models` and each model's endpoint record. The estimated price comes from the endpoint's pricing lines: per image or per megapixel (from the resolution tier), the line for the chosen resolution, plus reference images when sent; token-priced models say "known when done". A failed image isn't charged.
-  - **AI video**, opt-in per slide. Models, durations, resolutions and aspect ratios come from `/videos/models` (never a size next to them); a clip starts at the duration closest to 5 seconds. **Clip's own sound** is off by default (the narration plays anyway). The price from `pricing_skus` is shown before you confirm, with the SKU it's based on and a **Price details** list. Clips are downloaded with your key (the links aren't public), kept on the phone, and their cost is saved. Jobs are checked about every 30 seconds, keep going if you leave, and resume after a restart.
+  - **AI video**, opt-in per slide. Models, durations, resolutions and aspect ratios come from `/videos/models` (never a size next to them); a clip starts at the duration closest to 5 seconds. **Clip's own sound** is off by default (the narration plays anyway). The price from `pricing_skus` is shown before you confirm, with the SKU it's based on and a **Price details** list that says per second, per clip or per video token. A SKU without a unit in its name (like `generate`) is a price per second of video; `per_video` or `per_request` ones are per clip; video-token SKUs are estimated from the resolution and length; surcharges for reference images or edits aren't counted. Clips are downloaded with your key (the links aren't public), kept on the phone, and their cost is saved. Jobs are checked about every 30 seconds, keep going if you leave, and resume after a restart.
 - **Voice:**
   - an AI voice model from OpenRouter's speech models, with that model's own voices (`supported_voices`), **▶ Preview**, an optional **narrator style** (followed by OpenAI and Gemini voices) and speech speed (left out for models without it)
   - playback speed from 0.75× to 2× in the player
@@ -221,13 +223,15 @@ In each editor you choose:
 - the **length**, in the task's own terms: sentences, words, claims or elements
 - **every setting that model supports**, saved per model
 
-The answers' editor also holds the hidden system prompt. The answer model defaults to the newest Gemini Pro and can be changed per question. The **⚙** button next to the question box shows only the settings a model supports:
+The answers' editor also holds the hidden system prompt. The answer model defaults to the newest Gemini Pro and can be changed per question.
+
+**How answers think** (Settings › Models › Answers) is **High** by default (also Highest, Medium, Low, or each model's own default). It applies unless that model's own settings choose an effort, a budget or no reasoning, and is matched to the levels the model offers. A model listed without its reasoning levels (new ones like Gemini 4 Argon often are) still gets its family's usual levels. High thinking gets room to answer: 32k max tokens (64k for xhigh and max), never more than the model's own output limit. Each answer's footer names the thinking it used, and **More tokens** doubles what was actually sent. The **⚙** button next to the question box shows only the settings a model supports:
 
 | Model | Extra settings and exceptions |
 |---|---|
 | **Every model** | Reasoning effort, the budget slider and the off switch follow the model's `reasoning` info. Temperature, top-p, max tokens and the like appear where listed, plus provider routing and fallbacks. |
 | **Claude** | Effort can't be "none"; "minimal" is sent as "low". Max tokens stays above the reasoning budget. |
-| **Gemini 3** | Effort maps to Google's thinking level; reasoning usually can't be turned off. |
+| **Gemini 3 and newer** | Effort maps to Google's thinking level; reasoning usually can't be turned off. Listed without levels, Gemini gets high, medium, low and minimal. |
 | **Grok** | Effort level only. |
 | **GPT-5.6 and newer** | Pro mode, reasoning context and verbosity. |
 

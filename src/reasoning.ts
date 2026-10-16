@@ -3,6 +3,12 @@ import type { Effort } from "./types";
 export const ANSWER_ROOM = 4096;
 export const DEFAULT_MAX_TOKENS = 16000;
 
+/**
+ * Room for thinking plus the answer when no max_tokens is set: higher effort thinks longer, and a cap that's too
+ * low ends the answer while the model is still thinking (Gemini's guidance is at least 32k for hard prompts).
+ */
+const EFFORT_ROOM: Record<Effort, number> = { max: 65536, xhigh: 65536, high: 32768, medium: DEFAULT_MAX_TOKENS, low: DEFAULT_MAX_TOKENS, minimal: DEFAULT_MAX_TOKENS, none: DEFAULT_MAX_TOKENS };
+
 const RATIO: Record<Effort, number> = {
   max: 0.95,
   xhigh: 0.95,
@@ -29,9 +35,12 @@ export function requestMaxTokens(opts: {
   claude: boolean;
   userMax?: number;
   reasoning: ReasoningKind;
+  /** the model's own output limit (top_provider.max_completion_tokens), when known */
+  modelMax?: number | null;
 }): number {
-  const base = opts.userMax ?? DEFAULT_MAX_TOKENS;
   const r = opts.reasoning;
+  let base = opts.userMax ?? (r.kind === "effort" ? EFFORT_ROOM[r.effort] : DEFAULT_MAX_TOKENS);
+  if (opts.userMax === undefined && opts.modelMax) base = Math.min(base, opts.modelMax);
   if (r.kind === "budget") return Math.max(base, r.budget + ANSWER_ROOM);
   if (opts.claude && r.kind === "effort") {
     let m = base;
